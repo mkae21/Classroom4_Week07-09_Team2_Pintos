@@ -15,6 +15,18 @@
 #include "userprog/process.h"
 #endif
 
+
+#define offsetof(TYPE, MEMBER) __builtin_offsetof (TYPE, MEMBER)
+#define list_entry(LIST_ELEM, STRUCT, MEMBER)           \
+	((STRUCT *) ((uint8_t *) &(LIST_ELEM)->next     \
+		- offsetof (STRUCT, MEMBER.next)))
+struct value 
+  {
+    struct list_elem elem;      /* List element. */
+    int value;                  /* Item value. */
+  };
+
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -27,6 +39,8 @@
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
 static struct list ready_list;
+
+static struct list sleep_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -108,6 +122,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleep_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -153,6 +168,32 @@ thread_tick (void) {
 	if (++thread_ticks >= TIME_SLICE)
 		intr_yield_on_return ();
 }
+
+
+
+
+
+void
+thread_wakeup(int64_t ticks){
+	struct list_elem *e;
+	for (e = list_begin(&sleep_list); e!=list_end(&sleep_list); e = list_next(e)){
+
+	struct thread *now_thread = list_entry(e , struct thread , elem);
+	
+	if (now_thread->tick <= ticks && now_thread->status == THREAD_BLOCKED){
+		now_thread->status = THREAD_READY;
+		enum intr_level old_level = intr_disable ();
+		list_push_back (&ready_list, &now_thread->elem);
+		intr_set_level (old_level);
+		barrier();
+	}
+	
+	}
+
+}
+
+
+
 
 /* Prints thread statistics. */
 void
@@ -307,6 +348,50 @@ thread_yield (void) {
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
+
+static bool
+value_less (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED) 
+{
+  const struct value *a = list_entry (a_, struct value, elem);
+  const struct value *b = list_entry (b_, struct value, elem);
+  
+  return a->value < b->value;
+}
+
+
+void
+thread_sleep (int64_t tick) {
+	struct thread *curr = thread_current ();
+	enum intr_level old_level;
+	ASSERT (!intr_context ());
+
+	if (curr != idle_thread){
+	
+	curr->tick = tick;
+	curr->status = THREAD_BLOCKED;	
+	old_level = intr_disable ();
+	if (curr != idle_thread)
+		list_push_back (&sleep_list, &curr->elem);
+	intr_set_level (old_level);
+	
+	
+	}
+}
+
+// void
+// thread_sleep (int64_t tick) {
+// 	struct thread *curr = thread_current ();
+// 	enum intr_level old_level;
+
+// 	ASSERT (!intr_context ());
+// 	curr->tick = tick;
+// 	thread_block();
+// 	old_level = intr_disable ();
+// 	if (curr != idle_thread)
+// 		list_insert_ordered (&sleep_list, &curr->elem , value_less , NULL);
+// 	intr_set_level (old_level);
+// }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
