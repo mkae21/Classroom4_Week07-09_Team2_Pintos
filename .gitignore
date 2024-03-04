@@ -276,11 +276,17 @@ pyrightconfig.json
 
 ### VisualStudioCode ###
 .vscode/*
-!.vscode/settings.json
 !.vscode/tasks.json
-!.vscode/launch.json
 !.vscode/extensions.json
 !.vscode/*.code-snippets
+
+# 공유 settings는 settings_default.json으로 공유할 것
+#!.vscode/settings.json
+!.vscode/settings_default.json
+
+# 공유 launch.json은 launch_default.json으로 공유할 것
+#!.vscode/launch.json
+!.vscode/launch_default.json
 
 # Local History for Visual Studio Code
 .history/
