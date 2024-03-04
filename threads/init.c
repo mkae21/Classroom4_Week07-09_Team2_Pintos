@@ -67,7 +67,7 @@ int main (void) NO_RETURN;
 /* Pintos main program. */
 int
 main (void) {
-	uint64_t mem_end;
+	uint64_t mem_end; // memory end
 	char **argv;
 
 	/* Clear BSS and get machine's RAM size. */
