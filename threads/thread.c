@@ -186,6 +186,8 @@ thread_wakeup(int64_t ticks){
 		list_push_back (&ready_list, &now_thread->elem);
 		intr_set_level (old_level);
 		barrier();
+
+		//test
 	}
 	
 	}
