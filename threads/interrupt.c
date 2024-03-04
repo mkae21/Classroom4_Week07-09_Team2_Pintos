@@ -134,7 +134,7 @@ intr_set_level (enum intr_level level) {
 /* Enables interrupts and returns the previous interrupt status. */
 enum intr_level
 intr_enable (void) {
-	enum intr_level old_level = intr_get_level ();
+	enum intr_level old_level = intr_get_level (); //예전 인터럽트 상태 반환
 	ASSERT (!intr_context ());
 
 	/* Enable interrupts by setting the interrupt flag.
@@ -161,7 +161,7 @@ intr_disable (void) {
 
 /* Initializes the interrupt system. */
 void
-intr_init (void) {
+intr_init (void) { 
 	int i;
 
 	/* Initialize interrupt controller. */

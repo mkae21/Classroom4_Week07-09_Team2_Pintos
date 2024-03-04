@@ -96,17 +96,17 @@ void
 thread_init (void) {
 	ASSERT (intr_get_level () == INTR_OFF);
 
-	/* Reload the temporal gdt for the kernel
+	/* Reload the temporal gdt for the kernel, (gdt 는 global descriptor table)
 	 * This gdt does not include the user context.
-	 * The kernel will rebuild the gdt with user context, in gdt_init (). */
+	 * The kernel will rebuild the gdt with user context, in gdt_init (). */ // 커널이 gdt를 초기화 한다 유저의 컨텐츠를 포함해서
 	struct desc_ptr gdt_ds = {
-		.size = sizeof (gdt) - 1,
-		.address = (uint64_t) gdt
+		.size = sizeof (gdt) - 1, //1번 부터 시작함
+		.address = (uint64_t) gdt // 테이블 주소
 	};
-	lgdt (&gdt_ds);
+	lgdt (&gdt_ds); // global descriptor table load
 
-	/* Init the globla thread context */
-	lock_init (&tid_lock);
+	/* Init the global thread context */
+	lock_init (&tid_lock);//binary semaphore로 초기화 및 기능 구현 ,공유 자원 소유권 초기화
 	list_init (&ready_list);
 	list_init (&destruction_req);
 
@@ -119,14 +119,17 @@ thread_init (void) {
 
 /* Starts preemptive thread scheduling by enabling interrupts.
    Also creates the idle thread. */
+//인터럽트를 활성화하여 선점형 스레드 스케줄링을 시작, idle 스레드를 생성합니다 ,idle= blocked 상태.
+
 void
 thread_start (void) {
 	/* Create the idle thread. */
 	struct semaphore idle_started;
-	sema_init (&idle_started, 0);
-	thread_create ("idle", PRI_MIN, idle, &idle_started);
+	sema_init (&idle_started, 0); //idle thread semaphore를 0으로 초기화
+	thread_create ("idle", PRI_MIN, idle, &idle_started);//ready 상태 thread생성
 
 	/* Start preemptive thread scheduling. */
+
 	intr_enable ();
 
 	/* Wait for the idle thread to initialize idle_thread. */
@@ -136,7 +139,7 @@ thread_start (void) {
 /* Called by the timer interrupt handler at each timer tick.
    Thus, this function runs in an external interrupt context. */
 void
-thread_tick (void) {
+thread_tick (void) { 
 	struct thread *t = thread_current ();
 
 	/* Update statistics. */
@@ -205,7 +208,7 @@ thread_create (const char *name, int priority,
 	t->tf.eflags = FLAG_IF;
 
 	/* Add to run queue. */
-	thread_unblock (t);
+	thread_unblock (t); // thread 초기화시 blocked인 상태로 초기화 됨, ready 상태로 변경
 
 	return tid;
 }
@@ -380,7 +383,7 @@ idle (void *idle_started_ UNUSED) {
 
 		   See [IA32-v2a] "HLT", [IA32-v2b] "STI", and [IA32-v3a]
 		   7.11.1 "HLT Instruction". */
-		asm volatile ("sti; hlt" : : : "memory");
+		asm volatile ("sti; hlt" : : : "memory");//어셈블리
 	}
 }
 
@@ -403,12 +406,12 @@ init_thread (struct thread *t, const char *name, int priority) {
 	ASSERT (PRI_MIN <= priority && priority <= PRI_MAX);
 	ASSERT (name != NULL);
 
-	memset (t, 0, sizeof *t);
-	t->status = THREAD_BLOCKED;
-	strlcpy (t->name, name, sizeof t->name);
-	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
+	memset (t, 0, sizeof *t);//thread 0으로 초기화
+	t->status = THREAD_BLOCKED; // blocked로 바꿈
+	strlcpy (t->name, name, sizeof t->name); //길이 복사
+	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *); // for switching 
 	t->priority = priority;
-	t->magic = THREAD_MAGIC;
+	t->magic = THREAD_MAGIC; // for checking stackover flow
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

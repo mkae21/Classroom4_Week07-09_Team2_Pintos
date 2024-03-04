@@ -32,29 +32,32 @@ static void real_time_sleep (int64_t num, int32_t denom);
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
    corresponding interrupt. */
+
+//초당 PIT_FREQ번 인터럽트를 발생시키고, 해당하는 인터럽트를 등록합니다. */
 void
 timer_init (void) {
 	/* 8254 input frequency divided by TIMER_FREQ, rounded to
 	   nearest. */
-	uint16_t count = (1193180 + TIMER_FREQ / 2) / TIMER_FREQ;
+	uint16_t count = (1193180 + TIMER_FREQ / 2) / TIMER_FREQ; //인터럽트 주기 생성
 
 	outb (0x43, 0x34);    /* CW: counter 0, LSB then MSB, mode 2, binary. */
 	outb (0x40, count & 0xff);
 	outb (0x40, count >> 8);
 
-	intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+	intr_register_ext (0x20, timer_interrupt, "8254 Timer");//8254 타이머 인터럽트를 0x20번째 벡터에 등록 , 
+	//timer_interrupt는 타이머 인터럽트를 처리하는 함수
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
 void
-timer_calibrate (void) {
+timer_calibrate (void) { // 타이머 조정
 	unsigned high_bit, test_bit;
 
-	ASSERT (intr_get_level () == INTR_ON);
-	printf ("Calibrating timer...  ");
+	ASSERT (intr_get_level () == INTR_ON); // 인터럽트가 on
+	printf ("Calibrating timer...  "); // timer 조정중
 
-	/* Approximate loops_per_tick as the largest power-of-two
-	   still less than one timer tick. */
+
+/* loops_per_tick을 타이머 틱보다 작으면서 가장 큰 2의 거듭제곱으로 근사합니다. */
 	loops_per_tick = 1u << 10;
 	while (!too_many_loops (loops_per_tick << 1)) {
 		loops_per_tick <<= 1;
