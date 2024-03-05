@@ -67,44 +67,48 @@ int main (void) NO_RETURN;
 /* Pintos main program. */
 int
 main (void) {
-	uint64_t mem_end;
+	uint64_t mem_end; //for what? ->
 	char **argv;
 
 	/* Clear BSS and get machine's RAM size. */
-	bss_init ();
+	bss_init ();// bss 초기화, ram사이즈 얻기
 
 	/* Break command line into arguments and parse options. */
-	argv = read_command_line ();
-	argv = parse_options (argv);
+	argv = read_command_line ();// 읽기
+	argv = parse_options (argv); // 비-옵션 인자 반환해서 저장
 
 	/* Initialize ourselves as a thread so we can use locks,
 	   then enable console locking. */
-	thread_init ();
-	console_init ();
+
+	thread_init ();//thread초기화 
+	console_init (); //콘솔락 활성화
 
 	/* Initialize memory system. */
-	mem_end = palloc_init ();
-	malloc_init ();
-	paging_init (mem_end);
+	mem_end = palloc_init (); //페이지 할당기 초기화 하고 메모리 사이즈 return
+	malloc_init ();//malloc descriptor return
+	paging_init (mem_end);//페이징 함
 
-#ifdef USERPROG
+#ifdef USERPROG // USERPROG 매크로 등록 되어 있을 때 만
 	tss_init ();
 	gdt_init ();
 #endif
 
 	/* Initialize interrupt handlers. */
+	//인터럽트를 활성화 하고 등록한다
 	intr_init ();
-	timer_init ();
-	kbd_init ();
-	input_init ();
+	timer_init ();//인터럽트 주기를 생성하고 타이머 인터럽트 등록
+	kbd_init ();//keyboard의 의미?
+	input_init (); // input buffer 초기화
 #ifdef USERPROG
 	exception_init ();
 	syscall_init ();
 #endif
 	/* Start thread scheduler and enable interrupts. */
-	thread_start ();
-	serial_init_queue ();
-	timer_calibrate ();
+
+	thread_start ();//스레드 시작,안에서 스레드 생성 및 ready 큐에 넣어줌
+	serial_init_queue ();//대기열 기반의 인터럽트 주도 I/O을 위해 시리얼 포트 장치를 초기화,
+						//인터럽트 주도 I/O를 사용하면 시리얼 장치가 준비될 때까지 CPU시간을 낭비 x
+	timer_calibrate ();//타이머 조정
 
 #ifdef FILESYS
 	/* Initialize file system. */
@@ -119,12 +123,12 @@ main (void) {
 	printf ("Boot complete.\n");
 
 	/* Run actions specified on kernel command line. */
-	run_actions (argv);
+	run_actions (argv); // argv의 모든 요소 실행
 
 	/* Finish up. */
 	if (power_off_when_done)
 		power_off ();
-	thread_exit ();
+	thread_exit (); // 스레드 종료
 }
 
 /* Clear BSS */
@@ -204,10 +208,10 @@ read_command_line (void) {
    and returns the first non-option argument. */
 static char **
 parse_options (char **argv) {
-	for (; *argv != NULL && **argv == '-'; argv++) {
+	for (; *argv != NULL && **argv == '-'; argv++) {//point 배열이 비어있지 않고 첫 요소가 '-'라면 loop
 		char *save_ptr;
-		char *name = strtok_r (*argv, "=", &save_ptr);
-		char *value = strtok_r (NULL, "", &save_ptr);
+		char *name = strtok_r (*argv, "=", &save_ptr); //'=' 문자를 만나면 분리됨, save_ptr은 분기된 이후의 문자열 저장
+		char *value = strtok_r (NULL, "", &save_ptr);//두번 째 호출 부터는 전달된 인자의 분기점 부터 탐색, NULL 전달
 
 		if (!strcmp (name, "-h"))
 			usage ();

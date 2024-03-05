@@ -162,7 +162,7 @@ enum intr_level intr_get_level(void)
 	   5.8.1 "마스킹 가능한 하드웨어 인터럽트 마스킹"을 참조하세요. */
 	asm volatile("pushfq; popq %0" : "=g"(flags));
 
-	return flags & FLAG_IF ? INTR_ON : INTR_OFF;
+	return flags & FLAG_IF ? INTR_ON : INTR_OFF; // 비트 연산자로 flag 확인후 값을 반환
 }
 
 /* Enables or disables interrupts as specified by LEVEL and
@@ -178,6 +178,7 @@ enum intr_level intr_set_level(enum intr_level level)
 /* 인터럽트를 활성화하고 이전 인터럽트 상태를 반환합니다. */
 enum intr_level intr_enable(void)
 {
+  // 예전 인터럽트 상태 반환
 	enum intr_level old_level = intr_get_level();
 	ASSERT(!intr_context());
 
@@ -198,6 +199,7 @@ enum intr_level intr_enable(void)
 /* 인터럽트를 비활성화하고 이전 인터럽트 상태를 반환합니다. */
 enum intr_level intr_disable(void)
 {
+  // current interrupt status
 	enum intr_level old_level = intr_get_level();
 
 	/* Disable interrupts by clearing the interrupt flag.
