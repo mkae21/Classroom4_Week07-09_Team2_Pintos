@@ -622,9 +622,9 @@ schedule (void) { //스케줄링(어떤 순서로 진행 할지)
 		   The real destruction logic will be called at the beginning of the
 		   schedule(). */
 
-		ASSERT (curr != next);//예외처리
 		//Thread가 dying 일때 destruction_req 뒤에 push
 		if (curr && curr->status == THREAD_DYING && curr != initial_thread) {
+			ASSERT (curr != next);//예외처리
 			list_push_back (&destruction_req, &curr->elem);
 		}
 
@@ -646,4 +646,26 @@ allocate_tid (void) {
 	lock_release (&tid_lock);
 
 	return tid;
+}
+
+//thread_sleep
+void thread_sleep(int64_t ticks){
+
+	struct thread *curr = thread_current (); //현재 running thread point
+	enum intr_level old_level = intr_disable(); // disable 이전의 상태 가져오고 interrupt disable하게 만들기
+
+	ASSERT (!intr_context()); // 외부 interrupt 처리중이면 alert
+
+	curr->status = THREAD_BLOCKED;
+	curr->wake_up_time = ticks;
+	list_push_back (&sleep_list, &curr->elem); //sleep_list의 제일 뒤에 보낸다
+
+}
+
+
+void wake_up(int64_t ticks){
+
+
+
+	
 }

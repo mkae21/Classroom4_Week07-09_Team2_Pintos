@@ -192,16 +192,3 @@ real_time_sleep (int64_t num, int32_t denom) {
 	}
 }
 
-
-void thread_sleep(int64_t ticks){
-
-	struct thread *curr = thread_current (); //현재 running thread point
-	enum intr_level old_level = intr_disable(); // disable 이전의 상태 가져오고 interrupt disable하게 만들기
-
-	ASSERT (!intr_context()); // 외부 interrupt 처리중이면 alert
-
-	curr->status = THREAD_BLOCKED;
-	curr->wake_up_time = ticks;
-
-
-}
