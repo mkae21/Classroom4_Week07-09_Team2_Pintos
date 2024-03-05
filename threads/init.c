@@ -105,7 +105,7 @@ main (void) {
 #endif
 	/* Start thread scheduler and enable interrupts. */
 
-	thread_start ();//스레드 시작,안에서 스레드 생성
+	thread_start ();//스레드 시작,안에서 스레드 생성 및 ready 큐에 넣어줌
 	serial_init_queue ();//대기열 기반의 인터럽트 주도 I/O을 위해 시리얼 포트 장치를 초기화,
 						//인터럽트 주도 I/O를 사용하면 시리얼 장치가 준비될 때까지 CPU시간을 낭비 x
 	timer_calibrate ();//타이머 조정

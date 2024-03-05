@@ -91,7 +91,7 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
-
+	int wake_up_time;                //일어날 시간 저장
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 
@@ -116,10 +116,10 @@ extern bool thread_mlfqs;
 
 void thread_init (void);
 void thread_start (void);
+void thread_sleep(int64_t);//thread_sleep 함수 선언
 
 void thread_tick (void);
 void thread_print_stats (void);
-
 typedef void thread_func (void *aux);
 tid_t thread_create (const char *name, int priority, thread_func *, void *);
 
@@ -140,6 +140,7 @@ int thread_get_nice (void);
 void thread_set_nice (int);
 int thread_get_recent_cpu (void);
 int thread_get_load_avg (void);
+
 
 void do_iret (struct intr_frame *tf);
 

@@ -121,7 +121,7 @@ intr_get_level (void) {
 	   Interrupts". */
 	asm volatile ("pushfq; popq %0" : "=g" (flags));
 
-	return flags & FLAG_IF ? INTR_ON : INTR_OFF;
+	return flags & FLAG_IF ? INTR_ON : INTR_OFF; // 비트 연산자로 flag 확인후 값을 반환
 }
 
 /* Enables or disables interrupts as specified by LEVEL and
@@ -149,7 +149,7 @@ intr_enable (void) {
 /* Disables interrupts and returns the previous interrupt status. */
 enum intr_level
 intr_disable (void) {
-	enum intr_level old_level = intr_get_level ();
+	enum intr_level old_level = intr_get_level (); // current interrupt status
 
 	/* Disable interrupts by clearing the interrupt flag.
 	   See [IA32-v2b] "CLI" and [IA32-v3a] 5.8.1 "Masking Maskable
@@ -254,6 +254,8 @@ intr_register_int (uint8_t vec_no, int dpl, enum intr_level level,
 
 /* Returns true during processing of an external interrupt
    and false at all other times. */
+   
+//외부 인터럽트 처리중에는 true, 나머지는 false 반환
 bool
 intr_context (void) {
 	return in_external_intr;
