@@ -175,17 +175,22 @@ thread_tick (void) {
 
 void
 thread_wakeup(int64_t ticks){
+
+	if (list_empty (&sleep_list)){
+		return;
+	}
+
 	struct list_elem *e;
 	for (e = list_begin(&sleep_list); e!=list_end(&sleep_list); e = list_next(e)){
 
 	struct thread *now_thread = list_entry(e , struct thread , elem);
 	
 	if (now_thread->tick <= ticks && now_thread->status == THREAD_BLOCKED){
-		now_thread->status = THREAD_READY;
 		enum intr_level old_level = intr_disable ();
+		now_thread->status = THREAD_READY;
+		list_remove(e);
 		list_push_back (&ready_list, &now_thread->elem);
 		intr_set_level (old_level);
-		barrier();
 
 		//test
 	}
@@ -306,7 +311,7 @@ thread_current (void) {
 	   have overflowed its stack.  Each thread has less than 4 kB
 	   of stack, so a few big automatic arrays or moderate
 	   recursion can cause stack overflow. */
-	ASSERT (is_thread (t));
+	ASSERT (is_thread (t)); 
 	ASSERT (t->status == THREAD_RUNNING);
 
 	return t;
@@ -367,18 +372,16 @@ thread_sleep (int64_t tick) {
 	struct thread *curr = thread_current ();
 	enum intr_level old_level;
 	ASSERT (!intr_context ());
-
-	if (curr != idle_thread){
 	
+	old_level = intr_disable ();
+	if (curr != idle_thread){
 	curr->tick = tick;
 	curr->status = THREAD_BLOCKED;	
-	old_level = intr_disable ();
 	if (curr != idle_thread)
 		list_push_back (&sleep_list, &curr->elem);
-	intr_set_level (old_level);
-	
 	
 	}
+	intr_set_level (old_level);
 }
 
 // void
