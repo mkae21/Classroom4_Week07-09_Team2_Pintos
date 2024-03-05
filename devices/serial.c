@@ -77,6 +77,8 @@ init_poll (void) {
 /* Initializes the serial port device for queued interrupt-driven
    I/O.  With interrupt-driven I/O we don't waste CPU time
    waiting for the serial device to become ready. */
+   
+/* 대기열 기반의 인터럽트 주도 I/O를 위해 시리얼 포트 장치를 초기화합니다. 인터럽트 주도 I/O를 사용하면 시리얼 장치가 준비될 때까지 CPU 시간을 낭비하지 않습니다. */
 void
 serial_init_queue (void) {
 	enum intr_level old_level;
@@ -85,7 +87,7 @@ serial_init_queue (void) {
 		init_poll ();
 	ASSERT (mode == POLL);
 
-	intr_register_ext (0x20 + 4, serial_interrupt, "serial");
+	intr_register_ext (0x20 + 4, serial_interrupt, "serial");//인터럽트 등록
 	mode = QUEUE;
 	old_level = intr_disable ();
 	write_ier ();

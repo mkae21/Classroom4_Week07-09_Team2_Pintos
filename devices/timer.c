@@ -7,7 +7,6 @@
 #include "threads/io.h"
 #include "threads/synch.h"
 #include "threads/thread.h"
-
 /* See [8254] for hardware details of the 8254 timer chip. */
 
 #if TIMER_FREQ < 19
@@ -18,7 +17,7 @@
 #endif
 
 /* Number of timer ticks since OS booted. */
-static int64_t ticks;
+static int64_t ticks; // 전역 변수
 
 /* Number of loops per timer tick.
    Initialized by timer_calibrate(). */
@@ -32,29 +31,32 @@ static void real_time_sleep (int64_t num, int32_t denom);
 /* Sets up the 8254 Programmable Interval Timer (PIT) to
    interrupt PIT_FREQ times per second, and registers the
    corresponding interrupt. */
+
+//초당 PIT_FREQ번 인터럽트를 발생시키고, 해당하는 인터럽트를 등록합니다. */
 void
 timer_init (void) {
 	/* 8254 input frequency divided by TIMER_FREQ, rounded to
 	   nearest. */
-	uint16_t count = (1193180 + TIMER_FREQ / 2) / TIMER_FREQ;
+	uint16_t count = (1193180 + TIMER_FREQ / 2) / TIMER_FREQ; //인터럽트 주기 생성
 
 	outb (0x43, 0x34);    /* CW: counter 0, LSB then MSB, mode 2, binary. */
 	outb (0x40, count & 0xff);
 	outb (0x40, count >> 8);
 
-	intr_register_ext (0x20, timer_interrupt, "8254 Timer");
+	intr_register_ext (0x20, timer_interrupt, "8254 Timer");//8254 타이머 인터럽트를 0x20번째 벡터에 등록 , 
+	//timer_interrupt는 타이머 인터럽트를 처리하는 함수
 }
 
 /* Calibrates loops_per_tick, used to implement brief delays. */
 void
-timer_calibrate (void) {
+timer_calibrate (void) { // 타이머 조정
 	unsigned high_bit, test_bit;
 
-	ASSERT (intr_get_level () == INTR_ON);
-	printf ("Calibrating timer...  ");
+	ASSERT (intr_get_level () == INTR_ON); // 인터럽트가 on
+	printf ("Calibrating timer...  "); // timer 조정중
 
-	/* Approximate loops_per_tick as the largest power-of-two
-	   still less than one timer tick. */
+
+/* loops_per_tick을 타이머 틱보다 작으면서 가장 큰 2의 거듭제곱으로 근사합니다. */
 	loops_per_tick = 1u << 10;
 	while (!too_many_loops (loops_per_tick << 1)) {
 		loops_per_tick <<= 1;
@@ -73,28 +75,33 @@ timer_calibrate (void) {
 /* Returns the number of timer ticks since the OS booted. */
 int64_t
 timer_ticks (void) {
-	enum intr_level old_level = intr_disable ();
-	int64_t t = ticks;
-	intr_set_level (old_level);
+	enum intr_level old_level = intr_disable (); //interrupt 불가능하게 만들고 , old_level에 이전의 상태 넣기
+	int64_t t = ticks; //t에 전역변수 tick 값 넣기
+	intr_set_level (old_level); // old_level의 상태에 맞춰서 설정
 	barrier ();
-	return t;
+	return t; // tick값 반환
 }
 
 /* Returns the number of timer ticks elapsed since THEN, which
    should be a value once returned by timer_ticks(). */
 int64_t
 timer_elapsed (int64_t then) {
-	return timer_ticks () - then;
+	return timer_ticks () - then; //전역 변수 빼기 - 입력받은 시간
 }
 
 /* Suspends execution for approximately TICKS timer ticks. */
-void
-timer_sleep (int64_t ticks) {
-	int64_t start = timer_ticks ();
 
-	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+//
+void
+timer_sleep (int64_t ticks) {//ticks
+	int64_t start = timer_ticks (); //start에 전역 변수 tick값 저장(시작시간 기록) ,인터럽트 disable하게
+ 
+	ASSERT (intr_get_level () == INTR_ON); // 인터럽터 켜져있으면 alert, 인터럽트가 켜져있으면 핸들링하는 동안 무슨일 발생할지 몰라서
+	// while (timer_elapsed (start) < ticks)  //ticks - start < ticks --> 0 < ticks
+	// 	thread_yield ();//running thread를 ready_list 맨 뒤로 보내기
+
+	if(timer_elapsed(start) < ticks) // 경과 시간이 ticks보다 작다면
+		thread_sleep(start + ticks);// 재우기
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -183,4 +190,18 @@ real_time_sleep (int64_t num, int32_t denom) {
 		ASSERT (denom % 1000 == 0);
 		busy_wait (loops_per_tick * num / 1000 * TIMER_FREQ / (denom / 1000));
 	}
+}
+
+
+void thread_sleep(int64_t ticks){
+
+	struct thread *curr = thread_current (); //현재 running thread point
+	enum intr_level old_level = intr_disable(); // disable 이전의 상태 가져오고 interrupt disable하게 만들기
+
+	ASSERT (!intr_context()); // 외부 interrupt 처리중이면 alert
+
+	curr->status = THREAD_BLOCKED;
+	curr->wake_up_time = ticks;
+
+
 }
