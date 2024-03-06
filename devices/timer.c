@@ -127,10 +127,15 @@ void timer_sleep(int64_t ticks)
   // 인터럽트가 켜져 있으면 핸들링하는 동안 동기화 오류 발생
 	ASSERT(intr_get_level() == INTR_ON);
   
-  //ticks - start < ticks --> 0 < ticks
-	while (timer_elapsed(start) < ticks)
-    // running thread를 ready_list 맨 뒤로 보내기
-		thread_yield();
+//   //ticks - start < ticks --> 0 < ticks
+// 	while (timer_elapsed(start) < ticks)
+//     // running thread를 ready_list 맨 뒤로 보내기
+// 		thread_yield();
+	
+	/*start를 기점으로 경과 시간이 ticks보다 작으면
+	running thread를 sleep_list로 넣는다*/
+	if(timer_elapsed(start) < ticks)
+		thread_sleep(start + ticks);
 }
 
 /* Suspends execution for approximately MS milliseconds. */

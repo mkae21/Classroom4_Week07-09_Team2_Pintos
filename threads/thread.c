@@ -4,6 +4,8 @@
 #include <random.h>
 #include <stdio.h>
 #include <string.h>
+/*for quick sort*/
+#include <stdlib.h>
 #include "threads/flags.h"
 #include "threads/interrupt.h"
 #include "threads/intr-stubs.h"
@@ -281,7 +283,8 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.eflags = FLAG_IF;
 
 	/* Add to run queue. */
-	/* 실행 대기열에 추가합니다. */
+	/* 실행 대기열에 추가합니다. 
+	ready_list 삽입*/
 	thread_unblock(t);
 
 	return tid;
@@ -787,19 +790,25 @@ static tid_t allocate_tid(void)
 	return tid;
 }
 
-//thread_sleep
-// void thread_sleep(int64_t ticks){
+void thread_sleep(int64_t ticks){
+	/*running thread point*/
+	struct thread *curr = thread_current ();
+	/*직전의 interrupt 상태 old_level에 저장 및
+	interrupt disable하게 만들기*/
+	enum intr_level old_level = intr_disable(); 
+	
+	// 외부 interrupt 처리 중이 아닐 때
+	ASSERT (!intr_context()); 
 
-// 	struct thread *curr = thread_current (); //현재 running thread point
-// 	enum intr_level old_level = intr_disable(); // disable 이전의 상태 가져오고 interrupt disable하게 만들기
-
-// 	ASSERT (!intr_context()); // 외부 interrupt 처리중이면 alert
-
-// 	curr->status = THREAD_BLOCKED;
-// 	curr->wake_up_time = ticks;
-// 	list_push_back (&sleep_list, &curr->elem); //sleep_list의 제일 뒤에 보낸다
-
-// }
+	if(curr != idle_thread){
+	/*thread 상태 바꿔주고*/
+		//sleep_list의 제일 뒤에 보낸다
+		list_push_back (&sleep_list, &curr->elem); 
+	}
+	/*thread_ready로 context switching*/
+	do_schedule(THREAD_READY);
+	intr_set_level(old_level);
+}
 
 
 // void wake_up(int64_t ticks){
