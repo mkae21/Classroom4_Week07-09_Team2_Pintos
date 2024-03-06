@@ -247,6 +247,8 @@ list_remove (struct list_elem *elem) {
 
 /* Removes the front element from LIST and returns it.
    Undefined behavior if LIST is empty before removal. */
+
+//맨앞의 elem을 pop하고 반환 해줌, list가 비어있으면 안돼
 struct list_elem *
 list_pop_front (struct list *list) {
 	struct list_elem *front = list_front (list);
