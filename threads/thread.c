@@ -106,6 +106,28 @@ static uint64_t gdt[3] = { 0, 0x00af9a000000ffff, 0x00cf92000000ffff };
 
    It is not safe to call thread_current() until this function
    finishes. */
+
+bool local_tick(const struct list_elem *a,const struct list_elem *b,void *aux){
+    struct thread *A = list_entry(a , struct thread , elem);
+    struct thread *B = list_entry(b , struct thread , elem);
+
+    if (A->tick <= B->tick){
+        return true;
+    }
+    else return false;
+
+}
+bool larger(const struct list_elem *a,const struct list_elem *b,void *aux){
+    struct thread *A = list_entry(a , struct thread , elem);
+    struct thread *B = list_entry(b , struct thread , elem);
+
+    if (A->priority >= B->priority){
+        return true;
+    }
+    else return false;
+
+}
+
 void
 thread_init (void) {
 	ASSERT (intr_get_level () == INTR_OFF);
@@ -172,32 +194,29 @@ thread_tick (void) {
 
 
 
+void thread_wakeup(int64_t ticks)
+{
+    if (list_empty(&sleep_list))
+        return;
+    enum intr_level old_level;
+    struct thread *to_wakeup = list_entry(list_front(&sleep_list), struct thread, elem);
+    old_level = intr_disable();
+    while (to_wakeup->tick <= ticks)
+    {
 
-void
-thread_wakeup(int64_t ticks){
-
-	if (list_empty (&sleep_list)){
-		return;
-	}
-
-	struct list_elem *e;
-	for (e = list_begin(&sleep_list); e!=list_end(&sleep_list); e = list_next(e)){
-
-	struct thread *now_thread = list_entry(e , struct thread , elem);
-	
-	if (now_thread->tick <= ticks && now_thread->status == THREAD_BLOCKED){
-		enum intr_level old_level = intr_disable ();
-		now_thread->status = THREAD_READY;
-		list_remove(e);
-		list_push_back (&ready_list, &now_thread->elem);
-		intr_set_level (old_level);
-
-		//test
-	}
-	
-	}
-
+		
+        list_pop_front(&sleep_list);
+		// list_push_back (&ready_list, &to_wakeup->elem);
+        list_insert_ordered(&ready_list, &to_wakeup->elem, (list_less_func *)larger, NULL);
+        to_wakeup->status = THREAD_READY;
+        if (list_empty(&sleep_list))
+            return;
+        to_wakeup = list_entry(list_front(&sleep_list), struct thread, elem);
+    }
+    // printf("%lld \n", to_wakeup->wakeup_tick);
+    intr_set_level(old_level);
 }
+
 
 
 
@@ -289,6 +308,7 @@ thread_unblock (struct thread *t) {
 	old_level = intr_disable ();
 	ASSERT (t->status == THREAD_BLOCKED);
 	list_push_back (&ready_list, &t->elem);
+	// list_insert_ordered(&ready_list , &t->elem , (list_less_func *)priority , NULL);
 	t->status = THREAD_READY;
 	intr_set_level (old_level);
 }
@@ -352,51 +372,32 @@ thread_yield (void) {
 	old_level = intr_disable ();
 	if (curr != idle_thread)
 		list_push_back (&ready_list, &curr->elem);
+			// list_insert_ordered(&ready_list , &curr->elem , (list_less_func *)priority , NULL);
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
 
-static bool
-value_less (const struct list_elem *a_, const struct list_elem *b_,
-            void *aux UNUSED) 
+void thread_sleep(int64_t ticks)
 {
-  const struct value *a = list_entry (a_, struct value, elem);
-  const struct value *b = list_entry (b_, struct value, elem);
-  
-  return a->value < b->value;
+    struct thread *curr = thread_current();
+    enum intr_level old_level;
+    old_level = intr_disable();
+    if (curr != idle_thread)
+    {
+        curr->status = THREAD_BLOCKED;
+        curr->tick = ticks;
+		// list_push_back (&sleep_list, &curr->elem);
+        list_insert_ordered(&sleep_list, &curr->elem, (list_less_func *)local_tick, NULL);
+    }
+    schedule();
+    intr_set_level(old_level);
 }
 
 
-void
-thread_sleep (int64_t tick) {
-	struct thread *curr = thread_current ();
-	enum intr_level old_level;
-	ASSERT (!intr_context ());
-	
-	old_level = intr_disable ();
-	if (curr != idle_thread){
-	curr->tick = tick;
-	curr->status = THREAD_BLOCKED;	
-	if (curr != idle_thread)
-		list_push_back (&sleep_list, &curr->elem);
-	
-	}
-	intr_set_level (old_level);
-}
 
-// void
-// thread_sleep (int64_t tick) {
-// 	struct thread *curr = thread_current ();
-// 	enum intr_level old_level;
 
-// 	ASSERT (!intr_context ());
-// 	curr->tick = tick;
-// 	thread_block();
-// 	old_level = intr_disable ();
-// 	if (curr != idle_thread)
-// 		list_insert_ordered (&sleep_list, &curr->elem , value_less , NULL);
-// 	intr_set_level (old_level);
-// }
+
+
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
