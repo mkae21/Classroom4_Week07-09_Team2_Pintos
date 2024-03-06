@@ -86,15 +86,16 @@ typedef int tid_t;
 struct thread
 {
 	/* Owned by thread.c. */
-	/* 소유: thread.c. */
-	tid_t tid;				   /* Thread identifier. */
-							   /* 스레드 식별자. */
-	enum thread_status status; /* Thread state. */
-							   /* 스레드 상태. */
-	char name[16];			   /* Name (for debugging purposes). */
-							   /* 이름 (디버깅 목적). */
-	int priority;			   /* Priority. */
-							   /* 우선순위. */
+
+	tid_t tid;                          /* Thread identifier. */
+  							   /* 스레드 식별자. */
+	enum thread_status status;          /* Thread state. */
+  							   /* 스레드 상태. */
+	char name[16];                      /* Name (for debugging purposes). */
+  							   /* 이름 (디버깅 목적). */
+	int priority;                       /* Priority. */
+  							   /* 우선순위. */
+	int64_t tick;
 
 	/* Shared between thread.c and synch.c. */
 	/* thread.c와 synch.c가 공유합니다. */
@@ -147,8 +148,11 @@ struct thread *thread_current(void);
 tid_t thread_tid(void);
 const char *thread_name(void);
 
-void thread_exit(void) NO_RETURN;
-void thread_yield(void);
+
+void thread_exit (void) NO_RETURN;
+void thread_yield (void);
+void thread_sleep (int64_t tick);
+void thread_wakeup(int64_t tick);
 
 // 스레드의 wakeup_tick을 비교하여 빠른 순서대로 정렬하는 함수
 bool compare_wakeup_tick(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);

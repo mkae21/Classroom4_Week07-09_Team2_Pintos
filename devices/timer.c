@@ -116,6 +116,7 @@ int64_t timer_elapsed(int64_t then)
 }
 
 /* Suspends execution for approximately TICKS timer ticks. */
+
 /* 약 "TICKS" 타이머 틱 동안 실행을 일시 중단합니다. */
 void timer_sleep(int64_t ticks)
 {
@@ -130,7 +131,7 @@ void timer_sleep(int64_t ticks)
 	// // ticks - start < ticks --> 0 < ticks
 	// while (timer_elapsed(start) < ticks)
 	// 	// running thread를 ready_list 맨 뒤로 보내기
-	// 	thread_yield();
+	// 	thread_yield(); // busy wait
 
 	// context switching이 발생하면 start 값이 옳지 않을 수 있음
 	// 현재는 신경쓰지 않아도 되지만, 고칠 수 있으면 고칠 것 - Hyeonwoo, 2024.03.06
@@ -177,6 +178,7 @@ void timer_print_stats(void)
 static void timer_interrupt(struct intr_frame *args UNUSED)
 {
 	ticks++;
+  
 	// update the cpu usage for running process
 	// 실행 중인 프로세스에 대한 CPU 사용량 업데이트
 	thread_tick();
@@ -191,7 +193,9 @@ static void timer_interrupt(struct intr_frame *args UNUSED)
 	   깨울 스레드를 찾아서 필요한 경우 ready list로 이동합니다.
 	   글로벌 틱을 업데이트합니다. */
 	// sleep_list가 정렬된 상태라면 순회 시 성능 이점이 있음
-	thread_wakeup();
+  
+	thread_wakeup(ticks);
+  // thread_wakeup(); // 추후 성능 Test를 위한 백업 코드 - Hyeonwoo, 2024.03.06
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
