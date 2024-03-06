@@ -116,21 +116,23 @@ int64_t timer_elapsed(int64_t then)
 }
 
 /* Suspends execution for approximately TICKS timer ticks. */
+
 /* 약 "TICKS" 타이머 틱 동안 실행을 일시 중단합니다. */
-void timer_sleep(int64_t ticks)
-{
+void
+timer_sleep (int64_t ticks) {
   // start에 전역 변수 tick값 저장(시작시간 기록)
   // 인터럽트 disable하게
-	int64_t start = timer_ticks();
-  
+	int64_t start = timer_ticks ();
   // 인터럽터 켜져 있으면 alert
   // 인터럽트가 켜져 있으면 핸들링하는 동안 동기화 오류 발생
-	ASSERT(intr_get_level() == INTR_ON);
-  
-  //ticks - start < ticks --> 0 < ticks
-	while (timer_elapsed(start) < ticks)
-    // running thread를 ready_list 맨 뒤로 보내기
-		thread_yield();
+	ASSERT (intr_get_level () == INTR_ON);
+	if (timer_elapsed (start) < ticks)
+		thread_sleep(start + ticks);
+
+
+	// while(timer_elapsed (start) < ticks)
+	// thread_yield();  // busy wait
+
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -166,7 +168,10 @@ void timer_print_stats(void)
 static void timer_interrupt(struct intr_frame *args UNUSED)
 {
 	ticks++;
-	thread_tick();
+
+	thread_tick ();
+	thread_wakeup(ticks);
+
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

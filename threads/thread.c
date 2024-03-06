@@ -15,6 +15,18 @@
 #include "userprog/process.h"
 #endif
 
+
+#define offsetof(TYPE, MEMBER) __builtin_offsetof (TYPE, MEMBER)
+#define list_entry(LIST_ELEM, STRUCT, MEMBER)           \
+	((STRUCT *) ((uint8_t *) &(LIST_ELEM)->next     \
+		- offsetof (STRUCT, MEMBER.next)))
+struct value 
+  {
+    struct list_elem elem;      /* List element. */
+    int value;                  /* Item value. */
+  };
+
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -33,6 +45,7 @@
 /* 스레드_준비 상태의 프로세스, 즉 실행할 준비가 되었지만
    실제로 실행되지 않는 프로세스의 목록입니다. */
 static struct list ready_list;
+
 
 //sleep_list 생성
 static struct list sleep_list;
@@ -122,6 +135,28 @@ static uint64_t gdt[3] = {0, 0x00af9a000000ffff, 0x00cf92000000ffff};
 
    It is not safe to call thread_current() until this function
    finishes. */
+
+
+bool local_tick(const struct list_elem *a,const struct list_elem *b,void *aux){
+    struct thread *A = list_entry(a , struct thread , elem);
+    struct thread *B = list_entry(b , struct thread , elem);
+
+    if (A->tick <= B->tick){
+        return true;
+    }
+    else return false;
+
+}
+bool larger(const struct list_elem *a,const struct list_elem *b,void *aux){
+    struct thread *A = list_entry(a , struct thread , elem);
+    struct thread *B = list_entry(b , struct thread , elem);
+
+    if (A->priority >= B->priority){
+        return true;
+    }
+    else return false;
+
+}
 /* 현재 실행 중인 코드를 스레드로 변환하여 스레딩 시스템을 초기화합니다.
    일반적으로는 작동하지 않으며 이 경우에만 가능한 이유는 loader.S가
    스택의 맨 아래를 페이지 경계에 배치하도록 주의했기 때문입니다.
@@ -133,9 +168,10 @@ static uint64_t gdt[3] = {0, 0x00af9a000000ffff, 0x00cf92000000ffff};
 
    이 함수가 완료될 때까지 thread_current()를 호출하는 것은
    안전하지 않습니다.*/
-void thread_init(void)
-{
-	ASSERT(intr_get_level() == INTR_OFF);
+void
+thread_init (void) {
+	ASSERT (intr_get_level () == INTR_OFF);
+
 
 	/* Reload the temporal gdt for the kernel, (gdt 는 global descriptor table)
 	 * This gdt does not include the user context.
@@ -151,9 +187,11 @@ void thread_init(void)
 	/* Init the globla thread context */
 	/* 글로블 스레드 컨텍스트 초기화 */
   // binary semaphore로 초기화 및 기능 구현, 공유 자원 소유권 초기화
-	lock_init(&tid_lock); 
-	list_init(&ready_list);
-	list_init(&destruction_req);
+	lock_init (&tid_lock);
+	list_init (&ready_list);
+	list_init (&sleep_list);
+	list_init (&destruction_req);
+
 
 	/* Set up a thread structure for the running thread. */
 	/* 실행 중인 스레드에 대한 스레드 구조를 설정합니다. */
@@ -210,6 +248,36 @@ void thread_tick(void)
 	if (++thread_ticks >= TIME_SLICE)
 		intr_yield_on_return();
 }
+
+
+
+
+void thread_wakeup(int64_t ticks)
+{
+    if (list_empty(&sleep_list))
+        return;
+    enum intr_level old_level;
+    struct thread *to_wakeup = list_entry(list_front(&sleep_list), struct thread, elem);
+    old_level = intr_disable();
+    while (to_wakeup->tick <= ticks)
+    {
+
+		
+        list_pop_front(&sleep_list);
+		// list_push_back (&ready_list, &to_wakeup->elem);
+        list_insert_ordered(&ready_list, &to_wakeup->elem, (list_less_func *)larger, NULL);
+        to_wakeup->status = THREAD_READY;
+        if (list_empty(&sleep_list))
+            return;
+        to_wakeup = list_entry(list_front(&sleep_list), struct thread, elem);
+    }
+    // printf("%lld \n", to_wakeup->wakeup_tick);
+    intr_set_level(old_level);
+}
+
+
+
+
 
 /* Prints thread statistics. */
 /* 스레드 통계를 출력합니다. */
@@ -327,9 +395,12 @@ void thread_unblock(struct thread *t)
 
 	ASSERT(is_thread(t));
 
-	old_level = intr_disable();
-	ASSERT(t->status == THREAD_BLOCKED);
-	list_push_back(&ready_list, &t->elem);
+
+	old_level = intr_disable ();
+	ASSERT (t->status == THREAD_BLOCKED);
+	list_push_back (&ready_list, &t->elem);
+	// list_insert_ordered(&ready_list , &t->elem , (list_less_func *)priority , NULL);
+
 	t->status = THREAD_READY;
 	intr_set_level(old_level);
 }
@@ -357,12 +428,14 @@ struct thread *thread_current(void)
 	   have overflowed its stack.  Each thread has less than 4 kB//
 	   of stack, so a few big automatic arrays or moderate
 	   recursion can cause stack overflow. */
+
 	/* T가 실제로 스레드인지 확인하세요. 이러한 어설션 중 하나가
 	   실행되면 스레드의 스택이 오버플로되었을 수 있습니다. 각 스레드의
 	   스택은 4KB 미만이므로 몇 개의 큰 자동 배열이나 중간 정도의 재귀가
 	   스택 오버플로를 일으킬 수 있습니다. */
 	ASSERT(is_thread(t));
 	ASSERT(t->status == THREAD_RUNNING);
+
 
 	return t;
 }
@@ -412,16 +485,38 @@ void thread_yield(void)
 	old_level = intr_disable();
   
 	if (curr != idle_thread)
-	{
-    // ready_list의 제일 뒤에 보냄
-		list_push_back(&ready_list, &curr->elem);
-	}
-  
-  // ready 상태로 바꿔줌
-	do_schedule(THREAD_READY);
-  // old_level 값에 맞춰서 enable or disable
-	intr_set_level(old_level);
+
+        // ready_list의 제일 뒤에 보냄
+		list_push_back (&ready_list, &curr->elem);
+			// list_insert_ordered(&ready_list , &curr->elem , (list_less_func *)priority , NULL);
+    // ready 상태로 바꿔줌
+	do_schedule (THREAD_READY);
+    // old_level 값에 맞춰서 enable or disable
+	intr_set_level (old_level);
+
 }
+
+void thread_sleep(int64_t ticks)
+{
+    struct thread *curr = thread_current();
+    enum intr_level old_level;
+    old_level = intr_disable();
+    if (curr != idle_thread)
+    {
+        curr->status = THREAD_BLOCKED;
+        curr->tick = ticks;
+		// list_push_back (&sleep_list, &curr->elem);
+        list_insert_ordered(&sleep_list, &curr->elem, (list_less_func *)local_tick, NULL);
+    }
+    schedule();
+    intr_set_level(old_level);
+}
+
+
+
+
+
+
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 /* 현재 스레드의 우선순위를 NEW_PRIORITY로 설정합니다. */
