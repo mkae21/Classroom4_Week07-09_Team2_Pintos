@@ -50,7 +50,7 @@ void timer_init(void)
 	outb(0x40, count & 0xff);
 	outb(0x40, count >> 8);
 
-  // 8254 타이머 인터럽트를 0x20번째 벡터에 등록, 
+	// 8254 타이머 인터럽트를 0x20번째 벡터에 등록,
 	// timer_interrupt는 타이머 인터럽트를 처리하는 함수
 	intr_register_ext(0x20, timer_interrupt, "8254 Timer");
 }
@@ -68,8 +68,8 @@ void timer_calibrate(void)
 
 	/* Approximate loops_per_tick as the largest power-of-two
 	   still less than one timer tick. */
-  /* loops_per_tick을 타이머 틱보다 작으면서 
-     2의 최대 거듭제곱 값으로 근사합니다. */
+	/* loops_per_tick을 타이머 틱보다 작으면서
+	   2의 최대 거듭제곱 값으로 근사합니다. */
 
 	loops_per_tick = 1u << 10;
 
@@ -94,14 +94,14 @@ void timer_calibrate(void)
 /* OS 부팅 이후 타이머 틱 횟수를 반환합니다. */
 int64_t timer_ticks(void)
 {
-  // interrupt 불가능하게 만들고, old_level에 이전의 상태 넣기
+	// interrupt 불가능하게 만들고, old_level에 이전의 상태 넣기
 	enum intr_level old_level = intr_disable();
-  // t에 전역변수 tick 값 넣기
+	// t에 전역변수 tick 값 넣기
 	int64_t t = ticks;
-  // old_level의 상태에 맞춰서 설정
+	// old_level의 상태에 맞춰서 설정
 	intr_set_level(old_level);
 	barrier();
-  // tick 값 반환
+	// tick 값 반환
 	return t;
 }
 
@@ -111,7 +111,7 @@ int64_t timer_ticks(void)
    이 값은 timer_ticks()가 반환한 값이어야 합니다. */
 int64_t timer_elapsed(int64_t then)
 {
-  // 전역 변수 빼기 - 입력받은 시간
+	// 전역 변수 빼기 - 입력받은 시간
 	return timer_ticks() - then;
 }
 
@@ -119,18 +119,25 @@ int64_t timer_elapsed(int64_t then)
 /* 약 "TICKS" 타이머 틱 동안 실행을 일시 중단합니다. */
 void timer_sleep(int64_t ticks)
 {
-  // start에 전역 변수 tick값 저장(시작시간 기록)
-  // 인터럽트 disable하게
+	// start에 전역 변수 tick값 저장(시작시간 기록)
+	// 인터럽트 disable하게
 	int64_t start = timer_ticks();
-  
-  // 인터럽터 켜져 있으면 alert
-  // 인터럽트가 켜져 있으면 핸들링하는 동안 동기화 오류 발생
+
+	// 인터럽터 켜져 있으면 alert
+	// 인터럽트가 켜져 있으면 핸들링하는 동안 동기화 오류 발생
 	ASSERT(intr_get_level() == INTR_ON);
-  
-  //ticks - start < ticks --> 0 < ticks
-	while (timer_elapsed(start) < ticks)
-    // running thread를 ready_list 맨 뒤로 보내기
-		thread_yield();
+
+	// // ticks - start < ticks --> 0 < ticks
+	// while (timer_elapsed(start) < ticks)
+	// 	// running thread를 ready_list 맨 뒤로 보내기
+	// 	thread_yield();
+
+	// context switching이 발생하면 start 값이 옳지 않을 수 있음
+	// 현재는 신경쓰지 않아도 되지만, 고칠 수 있으면 고칠 것 - Hyeonwoo, 2024.03.06
+	if (timer_elapsed(start) < ticks)
+	{
+		thread_sleep(start + ticks);
+	}
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -163,10 +170,28 @@ void timer_print_stats(void)
 
 /* Timer interrupt handler. */
 /* 타이머 인터럽트 핸들러. */
+/* At every tick, check whether some thread must wake up
+   from sleep queue and call wake up function. */
+/* 매 틱마다 일부 스레드가 sleep queue에서 깨어나야 하는지
+   확인하고 wake_up 함수를 호출합니다. */
 static void timer_interrupt(struct intr_frame *args UNUSED)
 {
 	ticks++;
+	// update the cpu usage for running process
+	// 실행 중인 프로세스에 대한 CPU 사용량 업데이트
 	thread_tick();
+
+	/* code to add:
+	   check sleep list and the global tick.
+	   find any threads to wake up,
+	   move them to the ready list if necessary.
+	   update the global tick.*/
+	/* 추가할 코드:
+	   sleep list와 글로벌 틱을 확인합니다.
+	   깨울 스레드를 찾아서 필요한 경우 ready list로 이동합니다.
+	   글로벌 틱을 업데이트합니다. */
+	// sleep_list가 정렬된 상태라면 순회 시 성능 이점이 있음
+	thread_wakeup();
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
