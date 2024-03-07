@@ -483,8 +483,8 @@ void thread_yield(void)
 	if (curr != idle_thread)
   {
     // ready_list의 제일 뒤에 보냄
-		// list_push_back (&ready_list, &curr->elem);
-		list_insert_ordered(&ready_list , &curr->elem , (list_less_func *)priority , NULL);
+		list_push_back (&ready_list, &curr->elem);
+		// list_insert_ordered(&ready_list , &curr->elem , (list_less_func *)priority , NULL);
   }
     
     // ready 상태로 바꿔줌
@@ -964,78 +964,78 @@ static tid_t allocate_tid(void)
 	return tid;
 }
 
-void thread_sleep(int64_t ticks)
-{
-	/*running thread point*/
-	struct thread *curr = thread_current();
-	/*직전의 interrupt 상태 old_level에 저장 및
-	interrupt disable하게 만들기*/
-	enum intr_level old_level;
+// void thread_sleep(int64_t ticks)
+// {
+// 	/*running thread point*/
+// 	struct thread *curr = thread_current();
+// 	/*직전의 interrupt 상태 old_level에 저장 및
+// 	interrupt disable하게 만들기*/
+// 	enum intr_level old_level;
 
-	// 외부 interrupt 처리 중이 아닐 때
-	// ASSERT(!intr_context());
-	ASSERT(curr != idle_thread);
+// 	// 외부 interrupt 처리 중이 아닐 때
+// 	// ASSERT(!intr_context());
+// 	ASSERT(curr != idle_thread);
 
 
-	old_level = intr_disable();
-	/*thread 상태 바꿔주고*/
-	curr->wake_up_tick = ticks;
-	/*sleep_list의 제일 뒤에 보낸다
-	이때 정렬 해줘서 sleep_list
-	만들어 준다*/
+// 	old_level = intr_disable();
+// 	/*thread 상태 바꿔주고*/
+// 	curr->wake_up_tick = ticks;
+// 	/*sleep_list의 제일 뒤에 보낸다
+// 	이때 정렬 해줘서 sleep_list
+// 	만들어 준다*/
 
-	list_insert_ordered(&sleep_list, &curr->elem, (list_less_func *)compare_ticks, NULL);
-	thread_block();
-	/*thread_ready로 context switching*/
-	intr_set_level(old_level);
-}
+// 	list_insert_ordered(&sleep_list, &curr->elem, (list_less_func *)compare_ticks, NULL);
+// 	thread_block();
+// 	/*thread_ready로 context switching*/
+// 	intr_set_level(old_level);
+// }
 
-/*sleep_list에서 자는 thread를
-ready_list에 넣습니다*/	
-void wake_up(int64_t ticks)
-{
-	/*sleep list가 비어있으면 깨울 것이 없음*/
-	if (list_empty(&sleep_list))
-		return;
-	enum intr_level old_level;
-	struct thread *t;
+// /*sleep_list에서 자는 thread를
+// ready_list에 넣습니다*/	
+// void wake_up(int64_t ticks)
+// {
+// 	/*sleep list가 비어있으면 깨울 것이 없음*/
+// 	if (list_empty(&sleep_list))
+// 		return;
+// 	enum intr_level old_level;
+// 	struct thread *t;
 
-	/*interrupt disable*/
-	old_level = intr_disable();
-	/*sleep_list가 빌때 까지*/
-	while (!list_empty(&sleep_list)) 
-	{
-		t = list_entry(list_front(&sleep_list), struct thread, elem);
-		/*일어날 시간이 안됐으면 넘어감
-		(sleep_list에 시간 순으로 넣었기
-		해당 쓰레드의 시간이 되지 않았으면
-		뒤에 것은 볼 필요없다)*/
-		if (t->wake_up_tick > ticks)
-			break;
-		t->status = THREAD_READY;
-		list_pop_front(&sleep_list);
-		list_insert_ordered(&ready_list,&t->elem,(struct list_elem*)compare_priority,NULL);
-	}
+// 	/*interrupt disable*/
+// 	old_level = intr_disable();
+// 	/*sleep_list가 빌때 까지*/
+// 	while (!list_empty(&sleep_list)) 
+// 	{
+// 		t = list_entry(list_front(&sleep_list), struct thread, elem);
+// 		/*일어날 시간이 안됐으면 넘어감
+// 		(sleep_list에 시간 순으로 넣었기
+// 		해당 쓰레드의 시간이 되지 않았으면
+// 		뒤에 것은 볼 필요없다)*/
+// 		if (t->wake_up_tick > ticks)
+// 			break;
+// 		t->status = THREAD_READY;
+// 		list_pop_front(&sleep_list);
+// 		list_insert_ordered(&ready_list,&t->elem,(struct list_elem*)compare_priority,NULL);
+// 	}
 
-	intr_set_level(old_level);
-}
+// 	intr_set_level(old_level);
+// }
 
-/*a가 b보다 작을 때 false 반환*/
-bool compare_ticks(const struct list_elem *a_, const struct list_elem *b_,
-				   void *aux UNUSED)
-{
-	/*list_entry는 해당 요소가 있는 thread pointer 반환*/
-	const struct thread *a = list_entry(a_, struct thread, elem);
-	const struct thread *b = list_entry(b_, struct thread, elem);
-	/*tick을 기준으로 */
-	return a->wake_up_tick < b->wake_up_tick;
-}
+// /*a가 b보다 작을 때 false 반환*/
+// bool compare_ticks(const struct list_elem *a_, const struct list_elem *b_,
+// 				   void *aux UNUSED)
+// {
+// 	/*list_entry는 해당 요소가 있는 thread pointer 반환*/
+// 	const struct thread *a = list_entry(a_, struct thread, elem);
+// 	const struct thread *b = list_entry(b_, struct thread, elem);
+// 	/*tick을 기준으로 */
+// 	return a->wake_up_tick < b->wake_up_tick;
+// }
 
-bool compare_priority(const struct list_elem *a_, const struct list_elem *b_,
-				   void *aux UNUSED)
-{
-	const struct thread *a = list_entry(a_,struct thread, elem);
-	const struct thread *b = list_entry(b_,struct thread, elem);
+// bool compare_priority(const struct list_elem *a_, const struct list_elem *b_,
+// 				   void *aux UNUSED)
+// {
+// 	const struct thread *a = list_entry(a_,struct thread, elem);
+// 	const struct thread *b = list_entry(b_,struct thread, elem);
 
-	return a->priority > b->priority;
-}
+// 	return a->priority > b->priority;
+// }
