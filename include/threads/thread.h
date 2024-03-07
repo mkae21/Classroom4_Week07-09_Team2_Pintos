@@ -96,7 +96,6 @@ struct thread
 	int priority;                       /* Priority. */
   							   /* 우선순위. */
 	int64_t tick;
-
 	/* Shared between thread.c and synch.c. */
 	/* thread.c와 synch.c가 공유합니다. */
 	struct list_elem elem; /* List element. */
@@ -176,10 +175,10 @@ void thread_sleep(int64_t);
 /*larger 함수 전방 선언*/
 bool compare_ticks(const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED) ;
-/*wake_up 함수 전방 선언*/
-void wake_up(int64_t ticks);
 /*compare_ticks 전방 선언*/
 bool compare_priority(const struct list_elem *a_, const struct list_elem *b_,
 				   void *aux UNUSED);
+
+
 
 #endif /* threads/thread.h */

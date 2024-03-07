@@ -576,7 +576,7 @@ void list_insert_ordered(struct list *list, struct list_elem *elem,
 	ASSERT (list != NULL);
 	ASSERT (elem != NULL);
 	ASSERT (less != NULL);
-	/*list의 시작부터 끝까지 하나씩 tick을 비교후 자리 찾기 */
+	/*list의 시작부터 끝까지 하나씩 비교후 자리 찾기 */
 	for (e = list_begin (list); e != list_end (list); e = list_next (e))
 		/*priority elem과 e 비교하고 e가 더 크면 
 		break 'e' 앞자리가 'elem'자리*/
