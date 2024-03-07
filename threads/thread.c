@@ -15,6 +15,18 @@
 #include "userprog/process.h"
 #endif
 
+
+#define offsetof(TYPE, MEMBER) __builtin_offsetof (TYPE, MEMBER)
+#define list_entry(LIST_ELEM, STRUCT, MEMBER)           \
+	((STRUCT *) ((uint8_t *) &(LIST_ELEM)->next     \
+		- offsetof (STRUCT, MEMBER.next)))
+struct value 
+  {
+    struct list_elem elem;      /* List element. */
+    int value;                  /* Item value. */
+  };
+
+
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
    of thread.h for details. */
@@ -34,7 +46,7 @@
    실제로 실행되지 않는 프로세스의 목록입니다. */
 static struct list ready_list;
 
-// sleep_list 생성
+//sleep_list 생성
 static struct list sleep_list;
 
 /* Idle thread. */
@@ -96,9 +108,9 @@ static tid_t allocate_tid(void);
  * always at the beginning of a page and the stack pointer is
  * somewhere in the middle, this locates the curent thread. */
 /* 실행 중인 스레드를 반환합니다.
- * CPU의 스택 포인터 'rsp'를 읽은 다음 해당 포인터를 페이지의
-   시작 지점으로 내림으로 처리합니다. 'struct thread'가 항상
-   페이지의 시작 부분에 있고 스택 포인터는 중간 어딘가에 위치하기
+ * CPU의 스택 포인터 'rsp'를 읽은 다음 해당 포인터를 페이지의 
+   시작 지점으로 내림으로 처리합니다. 'struct thread'가 항상 
+   페이지의 시작 부분에 있고 스택 포인터는 중간 어딘가에 위치하기 
    때문에 이는 현재 스레드를 찾습니다. */
 #define running_thread() ((struct thread *)(pg_round_down(rrsp())))
 
@@ -122,6 +134,28 @@ static uint64_t gdt[3] = {0, 0x00af9a000000ffff, 0x00cf92000000ffff};
 
    It is not safe to call thread_current() until this function
    finishes. */
+
+
+bool local_tick(const struct list_elem *a,const struct list_elem *b,void *aux){
+    struct thread *A = list_entry(a , struct thread , elem);
+    struct thread *B = list_entry(b , struct thread , elem);
+
+    if (A->tick <= B->tick){
+        return true;
+    }
+    else return false;
+
+}
+bool larger(const struct list_elem *a,const struct list_elem *b,void *aux){
+    struct thread *A = list_entry(a , struct thread , elem);
+    struct thread *B = list_entry(b , struct thread , elem);
+
+    if (A->priority >= B->priority){
+        return true;
+    }
+    else return false;
+
+}
 /* 현재 실행 중인 코드를 스레드로 변환하여 스레딩 시스템을 초기화합니다.
    일반적으로는 작동하지 않으며 이 경우에만 가능한 이유는 loader.S가
    스택의 맨 아래를 페이지 경계에 배치하도록 주의했기 때문입니다.
@@ -133,9 +167,10 @@ static uint64_t gdt[3] = {0, 0x00af9a000000ffff, 0x00cf92000000ffff};
 
    이 함수가 완료될 때까지 thread_current()를 호출하는 것은
    안전하지 않습니다.*/
-void thread_init(void)
-{
-	ASSERT(intr_get_level() == INTR_OFF);
+void
+thread_init (void) {
+	ASSERT (intr_get_level () == INTR_OFF);
+
 
 	/* Reload the temporal gdt for the kernel, (gdt 는 global descriptor table)
 	 * This gdt does not include the user context.
@@ -144,9 +179,9 @@ void thread_init(void)
 	   이 gdt에는 사용자 컨텍스트가 포함되지 않습니다.
 	   커널은 gdt_init()에서 사용자 컨텍스트가 포함된 gdt를 다시 빌드합니다. */
 	struct desc_ptr gdt_ds = {
-		.size = sizeof(gdt) - 1,   // 1번 부터 시작함
-		.address = (uint64_t)gdt}; // 테이블 주소
-	lgdt(&gdt_ds);				   // global descriptor table load
+		.size = sizeof(gdt) - 1,  // 1번 부터 시작함
+		.address = (uint64_t)gdt};  // 테이블 주소
+	lgdt(&gdt_ds);  // global descriptor table load
 
 	/* Init the globla thread context */
 	/* 글로블 스레드 컨텍스트 초기화 */
@@ -211,6 +246,36 @@ void thread_tick(void)
 	if (++thread_ticks >= TIME_SLICE)
 		intr_yield_on_return();
 }
+
+
+
+
+void thread_wakeup(int64_t ticks)
+{
+    if (list_empty(&sleep_list))
+        return;
+    enum intr_level old_level;
+    struct thread *to_wakeup = list_entry(list_front(&sleep_list), struct thread, elem);
+    old_level = intr_disable();
+    while (to_wakeup->tick <= ticks)
+    {
+
+		
+        list_pop_front(&sleep_list);
+		// list_push_back (&ready_list, &to_wakeup->elem);
+        list_insert_ordered(&ready_list, &to_wakeup->elem, (list_less_func *)larger, NULL);
+        to_wakeup->status = THREAD_READY;
+        if (list_empty(&sleep_list))
+            return;
+        to_wakeup = list_entry(list_front(&sleep_list), struct thread, elem);
+    }
+    // printf("%lld \n", to_wakeup->wakeup_tick);
+    intr_set_level(old_level);
+}
+
+
+
+
 
 /* Prints thread statistics. */
 /* 스레드 통계를 출력합니다. */
@@ -329,9 +394,12 @@ void thread_unblock(struct thread *t)
 
 	ASSERT(is_thread(t));
 
-	old_level = intr_disable();
-	ASSERT(t->status == THREAD_BLOCKED);
-	list_push_back(&ready_list, &t->elem);
+
+	old_level = intr_disable ();
+	ASSERT (t->status == THREAD_BLOCKED);
+	list_push_back (&ready_list, &t->elem);
+	// list_insert_ordered(&ready_list , &t->elem , (list_less_func *)priority , NULL);
+
 	t->status = THREAD_READY;
 	intr_set_level(old_level);
 }
@@ -354,17 +422,18 @@ struct thread *thread_current(void)
 	// running 상태인 thread를 지역 변수 t에 할당
 	struct thread *t = running_thread();
 
-	/* Make sure T is really a thread. //T가 진짜 스레드 인지 확인
-	   If either of these assertions fire, then your thread may// 이러한 어설선 중 하나라도 발생하면 해당스레드는 stack overflow 발생 가능
-	   have overflowed its stack.  Each thread has less than 4 kB//
+	/* Make sure T is really a thread.
+	   If either of these assertions fire, then your thread may
+	   have overflowed its stack.  Each thread has less than 4 kB
 	   of stack, so a few big automatic arrays or moderate
 	   recursion can cause stack overflow. */
-	/* T가 실제로 스레드인지 확인하세요. 이러한 어설션 중 하나가
-	   실행되면 스레드의 스택이 오버플로되었을 수 있습니다. 각 스레드의
+	/* T가 실제로 스레드인지 확인하세요. 이러한 어설션 중 하나라도
+	   발생하면 해당 스레드의 스택이 오버플로되었을 수 있습니다. 각 스레드의
 	   스택은 4KB 미만이므로 몇 개의 큰 자동 배열이나 중간 정도의 재귀가
 	   스택 오버플로를 일으킬 수 있습니다. */
 	ASSERT(is_thread(t));
 	ASSERT(t->status == THREAD_RUNNING);
+
 
 	return t;
 }
@@ -403,26 +472,132 @@ void thread_exit(void)
    스케줄러의 변덕에 따라 즉시 다시 스케줄링될 수 있습니다. */
 void thread_yield(void)
 {
-	// running 상태인 thread를 지역 변수 t에 할당
-	struct thread *curr = thread_current();
-	enum intr_level old_level;
-
 	// 외부 인터럽트가 처리 중이면 alert
 	ASSERT(!intr_context());
 
 	// interrupt 불가능하게 만들고 직전 인터럽트 status 반환
-	old_level = intr_disable();
+	enum intr_level old_level = intr_disable();
+	// running 상태인 thread를 지역 변수 curr에 할당
+	struct thread *curr = thread_current();
 
 	if (curr != idle_thread)
-	{
-		// ready_list의 제일 뒤에 보냄
-		list_push_back(&ready_list, &curr->elem);
-	}
+  {
+    // ready_list의 제일 뒤에 보냄
+		// list_push_back (&ready_list, &curr->elem);
+		list_insert_ordered(&ready_list , &curr->elem , (list_less_func *)priority , NULL);
+  }
+    
+    // ready 상태로 바꿔줌
+	  do_schedule (THREAD_READY);
+  
+    // old_level 값에 맞춰서 enable or disable
+	  intr_set_level (old_level);
+}
 
-	// ready 상태로 바꿔줌
-	do_schedule(THREAD_READY);
-	// old_level 값에 맞춰서 enable or disable
-	intr_set_level(old_level);
+// 추후 Project1 완료 후 성능 Test를 위해 백업 - Hyeonwoo, 2024.03.06
+// void thread_yield(void)
+// {
+// 	// 외부 인터럽트가 처리 중이면 alert
+// 	ASSERT(!intr_context());
+
+// 	// interrupt 불가능하게 만들고 직전 인터럽트 status 반환
+// 	enum intr_level old_level = intr_disable();
+// 	// running 상태인 thread를 지역 변수 curr에 할당
+// 	struct thread *curr = thread_current();
+
+// 	if (curr != idle_thread)
+// 	{
+// 		// ready_list의 제일 뒤에 보냄
+// 		list_push_back(&ready_list, &curr->elem);
+// 	}
+
+// 	// ready 상태로 바꿔줌
+// 	do_schedule(THREAD_READY);
+
+// 	// old_level 값에 맞춰서 enable or disable
+// 	intr_set_level(old_level);
+// }
+
+// /* 스레드의 wake_up_tick을 비교하여 빠른 순서대로 정렬하는 함수 */
+// bool compare_wakeup_tick(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED)
+// {
+// 	struct thread *thread_a = list_entry(a, struct thread, elem);
+// 	struct thread *thread_b = list_entry(b, struct thread, elem);
+// 	return thread_a->wakeup_tick < thread_b->wakeup_tick;
+// }
+
+// // 스레드 상태를 blocked로 설정하고 sleep queue에 삽입한 후 대기하는 함수
+// void thread_sleep(int64_t tick)
+// {
+// 	/* If the current thread is not idle thread,
+// 	   change the state of the caller thread to BLOCKED,
+// 	   store the local tick to wake up, update the global
+// 	   tick if necessary, and call schedule() */
+// 	/* When you manipulate thread list, disable interrupt! */
+// 	/* 현재 스레드가 Idle 스레드가 아닌 경우 호출자 스레드의
+// 	   상태를 BLOCKED로 변경하고 로컬 틱을 저장하여 깨우고 필요한
+// 	   경우 전역 틱을 업데이트한 다음 schedule()을 호출합니다. */
+// 	/* 스레드 목록을 조작할 때는 인터럽트를 비활성화하세요! */
+// 	// running 상태인 thread를 지역 변수 curr에 할당
+// 	// 외부 인터럽트가 처리 중이면 alert
+// 	ASSERT(!intr_context());
+
+// 	// interrupt 불가능하게 만들고 직전 인터럽트 status 반환
+// 	enum intr_level old_level = intr_disable();
+// 	struct thread *curr = thread_current();
+
+// 	if (curr != idle_thread)
+// 	{
+// 		// sleep_list의 제일 뒤에 보냄
+// 		// list_push_back(&sleep_list, &curr->elem);
+
+// 		// 깨어날 시간 설정
+// 		curr->wakeup_tick = tick;
+
+// 		// sleep_list에 현재 스레드를 정렬하여 삽입
+// 		list_insert_ordered(&sleep_list, &curr->elem, compare_wakeup_tick, NULL);
+
+// 		// blocked 상태로 바꿔줌
+// 		thread_block();
+// 	}
+
+// 	// old_level 값에 맞춰서 enable or disable
+// 	intr_set_level(old_level);
+// }
+
+// // sleep queue에서 깨울 스레드를 찾아서 깨우는 함수
+// void thread_wakeup(void)
+// {
+// 	for (struct list_elem *e = list_begin(&sleep_list); e != list_end(&sleep_list);)
+// 	{
+// 		struct thread *t = list_entry(e, struct thread, elem);
+
+// 		if (t->wakeup_tick > timer_ticks())
+// 		{
+// 			break;
+// 		}
+
+// 		// 깨어날 시간이 현재 시간보다 작거나 같으면
+// 		// sleep_list에서 제거 후 ready_list에 추가
+// 		e = list_remove(e);
+// 		thread_unblock(t);
+// 	}
+// }
+
+void thread_sleep(int64_t ticks)
+{
+    struct thread *curr = thread_current();
+    enum intr_level old_level;
+    old_level = intr_disable();
+    if (curr != idle_thread)
+    {
+        curr->status = THREAD_BLOCKED;
+        curr->tick = ticks;
+		// list_push_back (&sleep_list, &curr->elem);
+        list_insert_ordered(&sleep_list, &curr->elem, (list_less_func *)local_tick, NULL);
+    }
+    schedule();
+    intr_set_level(old_level);
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */

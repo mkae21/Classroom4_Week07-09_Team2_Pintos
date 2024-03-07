@@ -116,25 +116,29 @@ int64_t timer_elapsed(int64_t then)
 }
 
 /* Suspends execution for approximately TICKS timer ticks. */
+
 /* 약 "TICKS" 타이머 틱 동안 실행을 일시 중단합니다. */
 void timer_sleep(int64_t ticks)
 {
 	// start에 전역 변수 tick값 저장(시작시간 기록)
 	// 인터럽트 disable하게
 	int64_t start = timer_ticks();
+
 	// 인터럽터 켜져 있으면 alert
 	// 인터럽트가 켜져 있으면 핸들링하는 동안 동기화 오류 발생
 	ASSERT(intr_get_level() == INTR_ON);
 
-	//   //ticks - start < ticks --> 0 < ticks
-	// 	while (timer_elapsed(start) < ticks)
-	//     // running thread를 ready_list 맨 뒤로 보내기
-	// 		thread_yield();
+	// // ticks - start < ticks --> 0 < ticks
+	// while (timer_elapsed(start) < ticks)
+	// 	// running thread를 ready_list 맨 뒤로 보내기
+	// 	thread_yield(); // busy wait
 
-	/*start를 기점으로 경과 시간이 ticks보다 작으면
-	running thread를 sleep_list로 넣는다
-	start+ticks 시간 이후에 일어나기*/
-	thread_sleep(start + ticks);
+	// context switching이 발생하면 start 값이 옳지 않을 수 있음
+	// 현재는 신경쓰지 않아도 되지만, 고칠 수 있으면 고칠 것 - Hyeonwoo, 2024.03.06
+	if (timer_elapsed(start) < ticks)
+	{
+		thread_sleep(start + ticks);
+	}
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -167,11 +171,31 @@ void timer_print_stats(void)
 
 /* Timer interrupt handler. */
 /* 타이머 인터럽트 핸들러. */
+/* At every tick, check whether some thread must wake up
+   from sleep queue and call wake up function. */
+/* 매 틱마다 일부 스레드가 sleep queue에서 깨어나야 하는지
+   확인하고 wake_up 함수를 호출합니다. */
 static void timer_interrupt(struct intr_frame *args UNUSED)
 {
 	ticks++;
+  
+	// update the cpu usage for running process
+	// 실행 중인 프로세스에 대한 CPU 사용량 업데이트
 	thread_tick();
-	wake_up(ticks);
+
+	/* code to add:
+	   check sleep list and the global tick.
+	   find any threads to wake up,
+	   move them to the ready list if necessary.
+	   update the global tick.*/
+	/* 추가할 코드:
+	   sleep list와 글로벌 틱을 확인합니다.
+	   깨울 스레드를 찾아서 필요한 경우 ready list로 이동합니다.
+	   글로벌 틱을 업데이트합니다. */
+	// sleep_list가 정렬된 상태라면 순회 시 성능 이점이 있음
+  
+	thread_wakeup(ticks);
+  // thread_wakeup(); // 추후 성능 Test를 위한 백업 코드 - Hyeonwoo, 2024.03.06
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer
