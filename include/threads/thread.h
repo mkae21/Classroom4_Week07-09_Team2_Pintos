@@ -95,7 +95,7 @@ struct thread
 							   /* 이름 (디버깅 목적). */
 	int priority;			   /* Priority. */
 							   /* 우선순위. */
-	int wake_up_tick;
+	int64_t wake_up_tick;
 	/* Shared between thread.c and synch.c. */
 	/* thread.c와 synch.c가 공유합니다. */
 	struct list_elem elem; /* List element. */
@@ -146,7 +146,6 @@ tid_t thread_tid(void);
 const char *thread_name(void);
 void thread_exit(void) NO_RETURN;
 void thread_yield(void);
-
 int thread_get_priority(void);
 void thread_set_priority(int);
 
@@ -158,4 +157,13 @@ int thread_get_load_avg(void);
 void do_iret(struct intr_frame *tf);
 /*thread sleep*/
 void thread_sleep(int64_t);
+/*larger 함수 전방 선언*/
+bool compare_ticks(const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED) ;
+/*wake_up 함수 전방 선언*/
+void wake_up(int64_t ticks);
+/*compare_ticks 전방 선언*/
+bool compare_priority(const struct list_elem *a_, const struct list_elem *b_,
+				   void *aux UNUSED);
+
 #endif /* threads/thread.h */
