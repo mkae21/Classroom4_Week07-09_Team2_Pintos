@@ -42,7 +42,7 @@ struct condition
 	struct list waiters; /* List of waiting threads. */
 						 /* 대기 스레드 목록. */
 };
-
+bool cond_priority(const struct list_elem *a, const struct list_elem  *b, void *aux); 
 void cond_init(struct condition *);
 void cond_wait(struct condition *, struct lock *);
 void cond_signal(struct condition *, struct lock *);

@@ -150,7 +150,7 @@ bool larger(const struct list_elem *a,const struct list_elem *b,void *aux){
     struct thread *A = list_entry(a , struct thread , elem);
     struct thread *B = list_entry(b , struct thread , elem);
 
-    if (A->priority >= B->priority){
+    if (A->priority > B->priority){
         return true;
     }
     else return false;
@@ -189,6 +189,7 @@ thread_init (void) {
 	lock_init(&tid_lock);
 	list_init(&ready_list);
 	list_init(&sleep_list);
+	
 	list_init(&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -249,14 +250,14 @@ void thread_tick(void)
 
 
 
-void thread_wakeup(int64_t ticks)
+void thread_wakeup(int64_t tick)
 {
     if (list_empty(&sleep_list))
         return;
     enum intr_level old_level;
     struct thread *to_wakeup = list_entry(list_front(&sleep_list), struct thread, elem);
     old_level = intr_disable();
-    while (to_wakeup->tick <= ticks)
+    while (to_wakeup->tick <= tick)
     {
         list_pop_front(&sleep_list);
 		// list_push_back (&ready_list, &to_wakeup->elem);
@@ -350,10 +351,10 @@ tid_t thread_create(const char *name, int priority,
 
 	struct thread *now_running_thread = thread_current();
 
-	if(!list_empty(&ready_list) && now_running_thread->priority < t->priority){
+	if(now_running_thread->priority < t->priority)
 		thread_yield();
 		
-	}
+	
 	intr_set_level(old_level);
 
 	return tid;
@@ -488,7 +489,7 @@ void thread_yield(void)
   {
     // ready_list의 제일 뒤에 보냄
 		// list_push_back (&ready_list, &curr->elem);
-		list_insert_ordered(&ready_list , &curr->elem , (list_less_func *)priority , NULL);
+		list_insert_ordered(&ready_list , &curr->elem , (list_less_func *)larger , NULL);
   }
     
     // ready 상태로 바꿔줌
@@ -606,9 +607,13 @@ void thread_sleep(int64_t ticks)
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
-thread_set_priority (int new_priority) {
-	thread_current ()->priority = new_priority;
-	if(!list_empty(&ready_list) && thread_current()->priority < list_entry(list_front(&ready_list), struct thread, elem)->priority)
+thread_set_priority (int new_priority)
+{
+	thread_current()->origin_priority = new_priority;
+	if (list_empty(&thread_current()->donations)) 
+		thread_current()->priority = new_priority;
+	
+	if (!list_empty(&ready_list) && list_entry(list_front(&ready_list), struct thread, elem)->priority > new_priority)
 		thread_yield();
 }
 
@@ -739,8 +744,10 @@ static void init_thread(struct thread *t, const char *name, int priority)
 	// for switching
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
+	t->origin_priority = priority;
 	// for checking stackover flow
 	t->magic = THREAD_MAGIC;
+	list_init(&t->donations);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
