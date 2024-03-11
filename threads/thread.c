@@ -350,17 +350,6 @@ tid_t thread_create(const char *name, int priority,
 	{
 		thread_yield();
 
-		// if(list_empty(&ready_list))
-		// 	return;
-
-		// struct thread *p = list_entry(list_front(&ready_list),struct thread,elem);
-
-		// if(thread_get_priority() < p->priority){
-
-		// 	int temp = thread_get_priority();
-		// 	thread_set_priority(p->priority);
-		// 	p->priority = temp;
-		// }
 	}
 
 	return tid;
@@ -408,7 +397,7 @@ void thread_unblock(struct thread *t)
 
 	old_level = intr_disable();
 	ASSERT(t->status == THREAD_BLOCKED);
-	// list_push_back (&ready_list, &t->elem);
+	/*ready_list 들어갈 때 priority순 정렬*/
 	list_insert_ordered(&ready_list, &t->elem, (list_less_func *)compare_priority, NULL);
 
 	t->status = THREAD_READY;
@@ -758,8 +747,11 @@ static void init_thread(struct thread *t, const char *name, int priority)
 	// for switching
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
+	t->origin_priority = priority;
 	// for checking stackover flow
 	t->magic = THREAD_MAGIC;
+	list_init(t->donations);
+
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

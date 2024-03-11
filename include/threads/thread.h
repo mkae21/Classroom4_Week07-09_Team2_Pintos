@@ -101,7 +101,6 @@ struct thread
 	struct list_elem elem; /* List element. */
 						   /* 리스트 요소. */
 
-	int64_t wakeup_tick;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -158,8 +157,6 @@ bool compare_wakeup_tick(const struct list_elem *a, const struct list_elem *b, v
 // 스레드 상태를 blocked로 설정하고 sleep queue에 삽입한 후 대기하는 함수
 void thread_sleep(int64_t tick);
 
-// sleep queue에서 깨울 스레드를 찾아서 깨우는 함수
-// void thread_wakeup(void);
 
 int thread_get_priority(void);
 void thread_set_priority(int);

@@ -175,7 +175,7 @@ struct list
    요소의 멤버 이름 MEMBER를 입력합니다. 예제는 파일 상단의 큰
    주석을 참조하세요. */
 
-/*리스트 안의 요소 정보를 알 수 있게 해준다*/
+/*리스트 안의 요소를 포함하고 있는 thread 포인터 반환*/
 #define list_entry(LIST_ELEM, STRUCT, MEMBER) \
    ((STRUCT *)((uint8_t *)&(LIST_ELEM)->next - offsetof(STRUCT, MEMBER.next)))
 
