@@ -65,6 +65,7 @@ struct condition
 						 /* 대기 스레드 목록. */
 };
 
+bool cond_priority(const struct list_elem *a, const struct list_elem *b, void *aux);
 // Initialize the condition variable data structure.
 // 조건 변수 자료 구조를 초기화합니다.
 void cond_init(struct condition *);

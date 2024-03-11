@@ -107,20 +107,19 @@ struct thread
 							   /* 이름 (디버깅 목적). */
 	int priority;			   /* Priority. */
 							   /* 우선순위. */
-	int init_priority;		   /* Initial priority. */
+	int origin_priority;	   /* Initial priority. */
 							   /* 초기 우선순위. */
 	int64_t tick;
-	// int64_t wakeup_tick;
+	int64_t wakeup_tick;
 
 	/* Shared between thread.c and synch.c. */
 	/* thread.c와 synch.c가 공유합니다. */
-	struct list_elem elem; /* List element. */
-						   /* 리스트 요소. */
-
+	struct list_elem elem;	   /* List element. */
+							   /* 리스트 요소. */
 	struct lock *wait_on_lock; /* Lock the thread is waiting for. */
-							   /* 스레드가 기다리는 락입니다. */
-	struct list donations;	   /* Donation list. */
-							   /* 기부 리스트. */
+							   /* 스레드가 기다리는 락. */
+	struct list donations;	   /* List of threads that donated priority. */
+							   /* 우선순위를 기부한 스레드 목록. */
 	struct list_elem d_elem;   /* Donation list element. */
 							   /* 기부 리스트 요소. */
 
@@ -193,7 +192,6 @@ void thread_exit(void) NO_RETURN;
 void thread_yield(void);
 
 void thread_sleep(int64_t tick);
-void thread_wakeup(int64_t tick);
 
 /* project 1 종료 이후 시간 여유가 되면 아래 함수로 성능 테스트 - Hyeonwoo, 2024.03.07 */
 // 스레드의 wakeup_tick을 비교하여 빠른 순서대로 정렬하는 함수
@@ -203,7 +201,7 @@ void thread_wakeup(int64_t tick);
 // void thread_sleep(int64_t tick);
 
 // sleep queue에서 깨울 스레드를 찾아서 깨우는 함수
-// void thread_wakeup(void);
+void thread_wakeup(void);
 
 int thread_get_priority(void);
 
@@ -221,5 +219,5 @@ int thread_get_recent_cpu(void);
 int thread_get_load_avg(void);
 
 void do_iret(struct intr_frame *tf);
-
+bool larger(const struct list_elem *a, const struct list_elem *b, void *aux);
 #endif /* threads/thread.h */

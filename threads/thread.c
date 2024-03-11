@@ -165,12 +165,14 @@ bool larger(const struct list_elem *a, const struct list_elem *b, void *aux)
 	struct thread *A = list_entry(a, struct thread, elem);
 	struct thread *B = list_entry(b, struct thread, elem);
 
-	if (A->priority >= B->priority)
+	if (A->priority > B->priority)
 	{
 		return true;
 	}
 	else
+	{
 		return false;
+	}
 }
 /* 현재 실행 중인 코드를 스레드로 변환하여 스레딩 시스템을 초기화합니다.
    일반적으로는 작동하지 않으며 이 경우에만 가능한 이유는 loader.S가
@@ -354,8 +356,16 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.eflags = FLAG_IF;
 
 	/* Add to run queue. */
-	/* 실행 대기열에 추가합니다. */
 	thread_unblock(t);
+	enum intr_level old_level;
+	old_level = intr_disable();
+
+	struct thread *now_running_thread = thread_current();
+
+	if (now_running_thread->priority < t->priority)
+		thread_yield();
+
+	intr_set_level(old_level);
 
 	/* Compare the priorities of the currently running thread
 	 * and the newly inserted one. Yield the CPU if the newly
@@ -409,8 +419,7 @@ void thread_unblock(struct thread *t)
 
 	old_level = intr_disable();
 	ASSERT(t->status == THREAD_BLOCKED);
-	list_push_back(&ready_list, &t->elem);
-	// list_insert_ordered(&ready_list , &t->elem , (list_less_func *)priority , NULL);
+	list_insert_ordered(&ready_list, &t->elem, (list_less_func *)larger, NULL);
 
 	t->status = THREAD_READY;
 	intr_set_level(old_level);
@@ -619,7 +628,12 @@ void thread_set_priority(int new_priority)
 	// TODO: Reorder the ready_list.
 	// TODO: 현재 스레드의 우선순위를 설정합니다.
 	// TODO: ready_list의 순서를 바꿉니다.
-	thread_current()->priority = new_priority;
+	thread_current()->origin_priority = new_priority;
+	if (list_empty(&thread_current()->donations))
+		thread_current()->priority = new_priority;
+
+	if (!list_empty(&ready_list) && list_entry(list_front(&ready_list), struct thread, elem)->priority > new_priority)
+		thread_yield();
 }
 
 /* Returns the current thread's priority. */
@@ -749,12 +763,12 @@ static void init_thread(struct thread *t, const char *name, int priority)
 	// for switching
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
-
 	// 현재 대기하고 있는 락을 가리키는 포인터이므로,
 	// 초기에는 어떤 락에도 대기하지 않는 상태(NULL)로 설정
-
+	t->origin_priority = priority;
 	// for checking stackover flow
 	t->magic = THREAD_MAGIC;
+	list_init(&t->donations);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
