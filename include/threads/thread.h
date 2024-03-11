@@ -9,6 +9,18 @@
 #include "vm/vm.h"
 #endif
 
+// #define DEBUG_THREADS
+
+#ifdef DEBUG_THREADS
+/* Prints FORMAT as if with printf(),
+   prefixing the output by the name of the test
+   and following it with a new-line character. */
+/* 출력 앞에 테스트 이름을 접두사로 붙이고
+   그 뒤에 새 줄 문자를 붙여 마치 printf()를
+   사용하는 것처럼 FORMAT을 인쇄합니다.*/
+void debug_msg(const char *format, ...);
+#endif
+
 /* States in a thread's life cycle. */
 /* 스레드 수명 주기의 상태. */
 enum thread_status
@@ -83,26 +95,34 @@ typedef int tid_t;
    엘리먼트이거나 세마포어 대기 목록(synch.c)의 엘리먼트가 될 수 있습니다.
    준비 상태의 스레드만 실행 대기열에 있는 반면, 차단 상태의 스레드만
    세마포어 대기 목록에 있기 때문에 이 두 가지 방법으로만 사용할 수 있습니다. */
+
 struct thread
 {
 	/* Owned by thread.c. */
-
-	tid_t tid;                          /* Thread identifier. */
-  							   /* 스레드 식별자. */
-	enum thread_status status;          /* Thread state. */
-  							   /* 스레드 상태. */
-	char name[16];                      /* Name (for debugging purposes). */
-  							   /* 이름 (디버깅 목적). */
-	int priority;                       /* Priority. */
-  							   /* 우선순위. */
+	tid_t tid;				   /* Thread identifier. */
+							   /* 스레드 식별자. */
+	enum thread_status status; /* Thread state. */
+							   /* 스레드 상태. */
+	char name[16];			   /* Name (for debugging purposes). */
+							   /* 이름 (디버깅 목적). */
+	int priority;			   /* Priority. */
+							   /* 우선순위. */
+	int init_priority;		   /* Initial priority. */
+							   /* 초기 우선순위. */
 	int64_t tick;
+	// int64_t wakeup_tick;
 
 	/* Shared between thread.c and synch.c. */
 	/* thread.c와 synch.c가 공유합니다. */
 	struct list_elem elem; /* List element. */
 						   /* 리스트 요소. */
 
-	int64_t wakeup_tick;
+	struct lock *wait_on_lock; /* Lock the thread is waiting for. */
+							   /* 스레드가 기다리는 락입니다. */
+	struct list donations;	   /* Donation list. */
+							   /* 기부 리스트. */
+	struct list_elem d_elem;   /* Donation list element. */
+							   /* 기부 리스트 요소. */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -139,30 +159,60 @@ void thread_tick(void);
 void thread_print_stats(void);
 
 typedef void thread_func(void *aux);
+
+// Point of updates
+// 1. Insert thread in ready_list in the order of priority. (note that it is not scalable)
+// 2. When the thread is added to the ready_list, compare priority of new thread and priority of the current thread.
+// 3. If the priority of the new thread is higher, call schedule() (the current thread yields CPU).
+
+// 업데이트 지점
+// 1. 우선순위에 따라 ready_list에 스레드를 삽입합니다. (확장 가능하지 않음에 유의하세요.)
+// -> "확장 가능하지 않음"은 스레드 개수가 많아지면 list로 관리하는 것이 비효율적임을 의미
+// -> list_insert_ordered가 있지만 스레드 개수가 많아지면 O(n^2)의 시간복잡도를 가짐
+// 2. 스레드가 ready_list에 추가되면 새 스레드의 우선순위와 현재 스레드의 우선순위를 비교합니다.
+// 3. 새 스레드의 우선순위가 더 높으면 schedule()을 호출합니다(현재 스레드에서 CPU를 산출합니다).
 tid_t thread_create(const char *name, int priority, thread_func *, void *);
 
 void thread_block(void);
+
+/* 스레드의 우선순위를 비교하여 높은 순서대로 정렬하는 함수 */
+bool compare_priority(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
+// When the thread is unblocked, it is inserted to `ready_list` in the priority order.
+// 스레드가 차단 해제되면 우선순위에 따라 `ready_list`에 삽입됩니다.
 void thread_unblock(struct thread *);
 
 struct thread *thread_current(void);
 tid_t thread_tid(void);
 const char *thread_name(void);
 
+void thread_exit(void) NO_RETURN;
 
-void thread_exit (void) NO_RETURN;
-void thread_yield (void);
-void thread_sleep (int64_t tick);
+// The current thread yields CPU and it is inserted to `ready_list` in priority order.
+// 현재 스레드의 CPU 사용량을 산출하여 우선순위에 따라 `ready_list`에 삽입합니다.
+void thread_yield(void);
+
+void thread_sleep(int64_t tick);
 void thread_wakeup(int64_t tick);
 
+/* project 1 종료 이후 시간 여유가 되면 아래 함수로 성능 테스트 - Hyeonwoo, 2024.03.07 */
 // 스레드의 wakeup_tick을 비교하여 빠른 순서대로 정렬하는 함수
-bool compare_wakeup_tick(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+// bool compare_wakeup_tick(const struct list_elem *a, const struct list_elem *b, void *aux UNUSED);
+
 // 스레드 상태를 blocked로 설정하고 sleep queue에 삽입한 후 대기하는 함수
-void thread_sleep(int64_t tick);
+// void thread_sleep(int64_t tick);
 
 // sleep queue에서 깨울 스레드를 찾아서 깨우는 함수
-void thread_wakeup(void);
+// void thread_wakeup(void);
 
 int thread_get_priority(void);
+
+// Set priority of the current thread.
+// Reorder the `ready_list`.
+// TODO: Set priority considering the donation.
+// 현재 스레드의 우선순위를 설정합니다.
+// `ready_list`의 순서를 변경합니다.
+// TODO: donation을 고려하여 우선순위를 설정합니다.
 void thread_set_priority(int);
 
 int thread_get_nice(void);
