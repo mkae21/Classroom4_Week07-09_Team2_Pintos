@@ -96,11 +96,19 @@ struct thread
 	int priority;                       /* Priority. */
   							   /* 우선순위. */
 	int64_t tick;
+
+	struct lock * wait_on_lock;
+	struct list donations;
+	struct list_elem d_elem;
+	int origin_priority;
+
+
 	/* Shared between thread.c and synch.c. */
 	/* thread.c와 synch.c가 공유합니다. */
 	struct list_elem elem; /* List element. */
 						   /* 리스트 요소. */
-
+	
+	int64_t wakeup_tick;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
@@ -166,16 +174,6 @@ void thread_set_nice(int);
 int thread_get_recent_cpu(void);
 int thread_get_load_avg(void);
 
-void do_iret(struct intr_frame *tf);
-/*thread sleep*/
-void thread_sleep(int64_t);
-/*larger 함수 전방 선언*/
-bool compare_ticks(const struct list_elem *a_, const struct list_elem *b_,
-            void *aux UNUSED) ;
-/*compare_ticks 전방 선언*/
-bool compare_priority(const struct list_elem *a_, const struct list_elem *b_,
-				   void *aux UNUSED);
-
-
-
+void do_iret (struct intr_frame *tf);
+bool larger(const struct list_elem *a, const struct list_elem *b, void *aux);
 #endif /* threads/thread.h */
