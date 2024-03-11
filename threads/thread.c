@@ -787,7 +787,7 @@ static struct thread *next_thread_to_run(void)
 		// ready_list가 비어있을 때 반환
 		return idle_thread;
 	else
-		// ready_list의 첫 요소 반환
+		// ready_list의 첫 스레드(요소) 반환
 		return list_entry(list_pop_front(&ready_list), struct thread, elem);
 }
 
@@ -930,10 +930,11 @@ static void do_schedule(int status)
  * 효율이 떨어집니다. */
 
 // 스케줄링
+/*다음 스레드를 running으로 만들어줌*/
 static void schedule(void)
 {
 	struct thread *curr = running_thread();
-	// next thread pointing
+	// next thread pointing, if ready_list에 한 개만 존재 할때 자기 포인팅
 	struct thread *next = next_thread_to_run();
 
 	ASSERT(intr_get_level() == INTR_OFF);
@@ -995,4 +996,13 @@ static tid_t allocate_tid(void)
 	lock_release(&tid_lock);
 
 	return tid;
+}
+
+bool compare_priority(const struct list_elem *a_, const struct list_elem *b_,
+					  void *aux UNUSED)
+{
+	const struct thread *a = list_entry(a_, struct thread, elem);
+	const struct thread *b = list_entry(b_, struct thread, elem);
+
+	return a->priority > b->priority;
 }

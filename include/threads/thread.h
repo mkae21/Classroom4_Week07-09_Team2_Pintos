@@ -201,7 +201,7 @@ void thread_sleep(int64_t tick);
 // void thread_sleep(int64_t tick);
 
 // sleep queue에서 깨울 스레드를 찾아서 깨우는 함수
-void thread_wakeup(void);
+void thread_wakeup(int64_t ticks);
 
 int thread_get_priority(void);
 
