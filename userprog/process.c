@@ -160,6 +160,9 @@ error:
 
 /* Switch the current execution context to the f_name.
  * Returns -1 on fail. */
+/*실행 되어야 하는 명령줄 받을 때 함수명과 매개변수를 분리해 주는 것
+현재 실행 context에서 f_name 으로 switch하라*/
+
 int
 process_exec (void *f_name) {
 	char *file_name = f_name;
