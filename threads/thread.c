@@ -15,17 +15,14 @@
 #include "userprog/process.h"
 #endif
 
-
-#define offsetof(TYPE, MEMBER) __builtin_offsetof (TYPE, MEMBER)
-#define list_entry(LIST_ELEM, STRUCT, MEMBER)           \
-	((STRUCT *) ((uint8_t *) &(LIST_ELEM)->next     \
-		- offsetof (STRUCT, MEMBER.next)))
-struct value 
-  {
-    struct list_elem elem;      /* List element. */
-    int value;                  /* Item value. */
-  };
-
+#define offsetof(TYPE, MEMBER) __builtin_offsetof(TYPE, MEMBER)
+#define list_entry(LIST_ELEM, STRUCT, MEMBER) \
+	((STRUCT *)((uint8_t *)&(LIST_ELEM)->next - offsetof(STRUCT, MEMBER.next)))
+struct value
+{
+	struct list_elem elem; /* List element. */
+	int value;			   /* Item value. */
+};
 
 /* Random value for struct thread's `magic' member.
    Used to detect stack overflow.  See the big comment at the top
@@ -135,20 +132,22 @@ static uint64_t gdt[3] = {0, 0x00af9a000000ffff, 0x00cf92000000ffff};
    It is not safe to call thread_current() until this function
    finishes. */
 
+bool local_tick(const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+	struct thread *A = list_entry(a, struct thread, elem);
+	struct thread *B = list_entry(b, struct thread, elem);
 
-bool local_tick(const struct list_elem *a,const struct list_elem *b,void *aux){
-    struct thread *A = list_entry(a , struct thread , elem);
-    struct thread *B = list_entry(b , struct thread , elem);
-
-    if (A->tick <= B->tick){
-        return true;
-    }
-    else return false;
-
+	if (A->tick <= B->tick)
+	{
+		return true;
+	}
+	else
+		return false;
 }
-bool larger(const struct list_elem *a,const struct list_elem *b,void *aux){
-    struct thread *A = list_entry(a , struct thread , elem);
-    struct thread *B = list_entry(b , struct thread , elem);
+bool larger(const struct list_elem *a, const struct list_elem *b, void *aux)
+{
+	struct thread *A = list_entry(a, struct thread, elem);
+	struct thread *B = list_entry(b, struct thread, elem);
 
     if (A->priority > B->priority){
         return true;
@@ -167,10 +166,9 @@ bool larger(const struct list_elem *a,const struct list_elem *b,void *aux){
 
    이 함수가 완료될 때까지 thread_current()를 호출하는 것은
    안전하지 않습니다.*/
-void
-thread_init (void) {
-	ASSERT (intr_get_level () == INTR_OFF);
-
+void thread_init(void)
+{
+	ASSERT(intr_get_level() == INTR_OFF);
 
 	/* Reload the temporal gdt for the kernel, (gdt 는 global descriptor table)
 	 * This gdt does not include the user context.
@@ -261,19 +259,16 @@ void thread_wakeup(int64_t tick)
     {
         list_pop_front(&sleep_list);
 		// list_push_back (&ready_list, &to_wakeup->elem);
-        list_insert_ordered(&ready_list, &to_wakeup->elem, (list_less_func *)larger, NULL);
-        to_wakeup->status = THREAD_READY;
-        if (list_empty(&sleep_list))
-            return;
-        to_wakeup = list_entry(list_front(&sleep_list), struct thread, elem);
-    }
-    // printf("%lld \n", to_wakeup->wakeup_tick);
-    intr_set_level(old_level);
+		list_insert_ordered(&ready_list, &to_wakeup->elem, (list_less_func *)larger, NULL);
+		to_wakeup->status = THREAD_READY;
+
+		if (list_empty(&sleep_list))
+			return;
+		to_wakeup = list_entry(list_front(&sleep_list), struct thread, elem);
+	}
+
+	intr_set_level(old_level);
 }
-
-
-
-
 
 /* Prints thread statistics. */
 /* 스레드 통계를 출력합니다. */
@@ -439,7 +434,6 @@ struct thread *thread_current(void)
 	ASSERT(is_thread(t));
 	ASSERT(t->status == THREAD_RUNNING);
 
-
 	return t;
 }
 
@@ -486,8 +480,8 @@ void thread_yield(void)
 	struct thread *curr = thread_current();
 
 	if (curr != idle_thread)
-  {
-    // ready_list의 제일 뒤에 보냄
+	{
+		// ready_list의 제일 뒤에 보냄
 		// list_push_back (&ready_list, &curr->elem);
 		list_insert_ordered(&ready_list , &curr->elem , (list_less_func *)larger , NULL);
   }
@@ -591,18 +585,19 @@ void thread_yield(void)
 
 void thread_sleep(int64_t ticks)
 {
-    struct thread *curr = thread_current();
-    enum intr_level old_level;
-    old_level = intr_disable();
-    if (curr != idle_thread)
-    {
-        curr->status = THREAD_BLOCKED;
-        curr->tick = ticks;
+
+	struct thread *curr = thread_current();
+	enum intr_level old_level;
+	old_level = intr_disable();
+	if (curr != idle_thread)
+	{
+		curr->status = THREAD_BLOCKED;
+		curr->tick = ticks;
 		// list_push_back (&sleep_list, &curr->elem);
-        list_insert_ordered(&sleep_list, &curr->elem, (list_less_func *)local_tick, NULL);
-    }
-    schedule();
-    intr_set_level(old_level);
+		list_insert_ordered(&sleep_list, &curr->elem, (list_less_func *)local_tick, NULL);
+	}
+	schedule();
+	intr_set_level(old_level);
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
@@ -766,7 +761,7 @@ static struct thread *next_thread_to_run(void)
 		// ready_list가 비어있을 때 반환
 		return idle_thread;
 	else
-		// ready_list의 첫 요소 반환
+		// ready_list의 첫 스레드(요소) 반환
 		return list_entry(list_pop_front(&ready_list), struct thread, elem);
 }
 
@@ -909,10 +904,11 @@ static void do_schedule(int status)
  * 효율이 떨어집니다. */
 
 // 스케줄링
+/*다음 스레드를 running으로 만들어줌*/
 static void schedule(void)
 {
 	struct thread *curr = running_thread();
-	// next thread pointing
+	// next thread pointing, if ready_list에 한 개만 존재 할때 자기 포인팅
 	struct thread *next = next_thread_to_run();
 
 	ASSERT(intr_get_level() == INTR_OFF);
@@ -975,3 +971,28 @@ static tid_t allocate_tid(void)
 
 	return tid;
 }
+
+bool compare_priority(const struct list_elem *a_, const struct list_elem *b_,
+					  void *aux UNUSED)
+{
+	const struct thread *a = list_entry(a_, struct thread, elem);
+	const struct thread *b = list_entry(b_, struct thread, elem);
+
+	return a->priority > b->priority;
+}
+
+// /*Sets the current thread's priority to new priority.
+// If the current thread no longer has the highest priority, yields.*/
+// void thread_create(int new_priority){
+// 	/*running thread*/
+// 	int running_priorty	= thread_get_priority();
+
+// 	// enum intr_level oldlevel = intr_disable();
+
+// 	/*recently inserted thread
+// 	즉,최근 ready_list에 들어간 thread*/
+// 	if(running_priorty < recent_out->priority){
+// 		thread_yield();
+// 	}
+
+// }
