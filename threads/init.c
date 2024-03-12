@@ -38,8 +38,6 @@
 #include "filesys/fsutil.h"
 #endif
 
-#define USERPROG // for debugging
-
 /* Page-map-level-4 with kernel mappings only. */
 /* 커널 매핑만 있는 페이지 맵 레벨 4. */
 uint64_t *base_pml4;
