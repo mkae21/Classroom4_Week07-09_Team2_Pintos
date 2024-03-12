@@ -178,7 +178,7 @@ enum intr_level intr_set_level(enum intr_level level)
 /* 인터럽트를 활성화하고 이전 인터럽트 상태를 반환합니다. */
 enum intr_level intr_enable(void)
 {
-  // 예전 인터럽트 상태 반환
+	// 예전 인터럽트 상태 반환
 	enum intr_level old_level = intr_get_level();
 	ASSERT(!intr_context());
 
@@ -199,7 +199,7 @@ enum intr_level intr_enable(void)
 /* 인터럽트를 비활성화하고 이전 인터럽트 상태를 반환합니다. */
 enum intr_level intr_disable(void)
 {
-  // current interrupt status
+	// current interrupt status
 	enum intr_level old_level = intr_get_level();
 
 	/* Disable interrupts by clearing the interrupt flag.
@@ -242,25 +242,44 @@ void intr_init(void)
 
 	/* Initialize intr_names. */
 	/* intr_names를 초기화합니다. */
-	intr_names[0] = "#DE Divide Error";
-	intr_names[1] = "#DB Debug Exception";
-	intr_names[2] = "NMI Interrupt";
-	intr_names[3] = "#BP Breakpoint Exception";
-	intr_names[4] = "#OF Overflow Exception";
-	intr_names[5] = "#BR BOUND Range Exceeded Exception";
-	intr_names[6] = "#UD Invalid Opcode Exception";
-	intr_names[7] = "#NM Device Not Available Exception";
-	intr_names[8] = "#DF Double Fault Exception";
-	intr_names[9] = "Coprocessor Segment Overrun";
-	intr_names[10] = "#TS Invalid TSS Exception";
-	intr_names[11] = "#NP Segment Not Present";
-	intr_names[12] = "#SS Stack Fault Exception";
-	intr_names[13] = "#GP General Protection Exception";
-	intr_names[14] = "#PF Page-Fault Exception";
-	intr_names[16] = "#MF x87 FPU Floating-Point Error";
-	intr_names[17] = "#AC Alignment Check Exception";
-	intr_names[18] = "#MC Machine-Check Exception";
-	intr_names[19] = "#XF SIMD Floating-Point Exception";
+	// intr_names[0] = "#DE Divide Error";
+	// intr_names[1] = "#DB Debug Exception";
+	// intr_names[2] = "NMI Interrupt";
+	// intr_names[3] = "#BP Breakpoint Exception";
+	// intr_names[4] = "#OF Overflow Exception";
+	// intr_names[5] = "#BR BOUND Range Exceeded Exception";
+	// intr_names[6] = "#UD Invalid Opcode Exception";
+	// intr_names[7] = "#NM Device Not Available Exception";
+	// intr_names[8] = "#DF Double Fault Exception";
+	// intr_names[9] = "Coprocessor Segment Overrun";
+	// intr_names[10] = "#TS Invalid TSS Exception";
+	// intr_names[11] = "#NP Segment Not Present";
+	// intr_names[12] = "#SS Stack Fault Exception";
+	// intr_names[13] = "#GP General Protection Exception";
+	// intr_names[14] = "#PF Page-Fault Exception";
+	// intr_names[16] = "#MF x87 FPU Floating-Point Error";
+	// intr_names[17] = "#AC Alignment Check Exception";
+	// intr_names[18] = "#MC Machine-Check Exception";
+	// intr_names[19] = "#XF SIMD Floating-Point Exception";
+	intr_names[0] = "#DE 분할 오류";
+	intr_names[1] = "#DB 디버그 예외";
+	intr_names[2] = "NMI 인터럽트";
+	intr_names[3] = "#BP 중단점 예외";
+	intr_names[4] = "#OF 오버플로 예외";
+	intr_names[5] = "#BR BOUND 범위 초과 예외";
+	intr_names[6] = "#UD 잘못된 Opcode 예외";
+	intr_names[7] = "#NM 장치를 사용할 수 없음 예외";
+	intr_names[8] = "#DF 이중 오류 예외";
+	intr_names[9] = "Coprocessor 세그먼트 오버런";
+	intr_names[10] = "#TS 유효하지 않은 TSS 예외";
+	intr_names[11] = "#NP 세그먼트 없음";
+	intr_names[12] = "#SS 스택 오류 예외";
+	intr_names[13] = "#GP 일반 보호 예외";
+	intr_names[14] = "#PF 페이지 결함 예외";
+	intr_names[16] = "#MF x87 FPU 부동 소수점 오류";
+	intr_names[17] = "#AC 정렬 검사 예외";
+	intr_names[18] = "#MC 머신 체크 예외";
+	intr_names[19] = "#XF SIMD 부동 소수점 예외";
 }
 
 /* Registers interrupt VEC_NO to invoke HANDLER with descriptor
