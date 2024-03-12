@@ -5,18 +5,20 @@
 #include <stdint.h>
 
 /* Interrupts on or off? */
-enum intr_level {
-	INTR_OFF,             /* Interrupts disabled. */
-	INTR_ON               /* Interrupts enabled. */
+enum intr_level
+{
+	INTR_OFF, /* Interrupts disabled. */
+	INTR_ON	  /* Interrupts enabled. */
 };
 
-enum intr_level intr_get_level (void);
-enum intr_level intr_set_level (enum intr_level);
-enum intr_level intr_enable (void);
-enum intr_level intr_disable (void);
+enum intr_level intr_get_level(void);
+enum intr_level intr_set_level(enum intr_level);
+enum intr_level intr_enable(void);
+enum intr_level intr_disable(void);
 
 /* Interrupt stack frame. */
-struct gp_registers {
+struct gp_registers
+{
 	uint64_t r15;
 	uint64_t r14;
 	uint64_t r13;
@@ -34,9 +36,12 @@ struct gp_registers {
 	uint64_t rax;
 } __attribute__((packed));
 
-struct intr_frame {
+struct intr_frame
+{
 	/* Pushed by intr_entry in intr-stubs.S.
 	   These are the interrupted task's saved registers. */
+	/* intr-stubs.s의 intr_entry에 의해 푸시되었습니다.
+	   중단된 작업의 저장된 레지스터입니다. */
 	struct gp_registers R;
 	uint16_t es;
 	uint16_t __pad1;
@@ -45,13 +50,20 @@ struct intr_frame {
 	uint16_t __pad3;
 	uint32_t __pad4;
 	/* Pushed by intrNN_stub in intr-stubs.S. */
+	/* intr-stubs.S의 intrNN_stub에 의해 푸시되었습니다. */
 	uint64_t vec_no; /* Interrupt vector number. */
-/* Sometimes pushed by the CPU,
-   otherwise for consistency pushed as 0 by intrNN_stub.
-   The CPU puts it just under `eip', but we move it here. */
+					 /* 인터럽트 벡터 번호. */
+	/* Sometimes pushed by the CPU, otherwise for consistency
+	   pushed as 0 by intrNN_stub. The CPU puts it just under
+	   `eip', but we move it here. */
+	/* 때로는 CPU에 의해 푸시되고, 그렇지 않으면 일관성을 위해
+	   intrNN_stub에 의해 0으로 푸시됩니다. CPU는 `eip' 바로
+	   아래에 넣지만, 여기로 옮깁니다. */
 	uint64_t error_code;
-/* Pushed by the CPU.
-   These are the interrupted task's saved registers. */
+	/* Pushed by the CPU.
+	   These are the interrupted task's saved registers. */
+	/* CPU에 의해 푸시됩니다.
+	   중단된 작업의 저장된 레지스터입니다. */
 	uintptr_t rip;
 	uint16_t cs;
 	uint16_t __pad5;
@@ -63,16 +75,16 @@ struct intr_frame {
 	uint32_t __pad8;
 } __attribute__((packed));
 
-typedef void intr_handler_func (struct intr_frame *);
+typedef void intr_handler_func(struct intr_frame *);
 
-void intr_init (void);
-void intr_register_ext (uint8_t vec, intr_handler_func *, const char *name);
-void intr_register_int (uint8_t vec, int dpl, enum intr_level,
-                        intr_handler_func *, const char *name);
-bool intr_context (void);
-void intr_yield_on_return (void);
+void intr_init(void);
+void intr_register_ext(uint8_t vec, intr_handler_func *, const char *name);
+void intr_register_int(uint8_t vec, int dpl, enum intr_level,
+					   intr_handler_func *, const char *name);
+bool intr_context(void);
+void intr_yield_on_return(void);
 
-void intr_dump_frame (const struct intr_frame *);
-const char *intr_name (uint8_t vec);
+void intr_dump_frame(const struct intr_frame *);
+const char *intr_name(uint8_t vec);
 
 #endif /* threads/interrupt.h */
