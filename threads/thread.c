@@ -326,21 +326,20 @@ void thread_print_stats(void)
 tid_t thread_create(const char *name, int priority,
 					thread_func *function, void *aux)
 {
-	struct thread *t;
-	tid_t tid;
-
 	ASSERT(function != NULL);
 
-	/* Allocate thread. */
-	/* 스레드를 할당합니다. */
-	t = palloc_get_page(PAL_ZERO);
-	if (t == NULL)
-		return TID_ERROR;
+	struct thread *t = palloc_get_page(PAL_ZERO); /* allocating one page */
+												  /* 페이지 할당 */
 
-	/* Initialize thread. */
-	/* 스레드를 초기화합니다. */
-	init_thread(t, name, priority);
-	tid = t->tid = allocate_tid();
+	if (t == NULL)
+	{
+		return TID_ERROR;
+	}
+
+	init_thread(t, name, priority);		 /* initialize thread structure */
+										 /* `struct thread` 초기화 */
+	tid_t tid = t->tid = allocate_tid(); /* allocate tid */
+										 /* tid 할당 */
 
 	/* Call the kernel_thread if it scheduled.
 	 * Note) rdi is 1st argument, and rsi is 2nd argument. */
@@ -357,15 +356,9 @@ tid_t thread_create(const char *name, int priority,
 
 	/* Add to run queue. */
 	thread_unblock(t);
-	enum intr_level old_level;
-	old_level = intr_disable();
 
+	enum intr_level old_level = intr_disable();
 	struct thread *now_running_thread = thread_current();
-
-	if (now_running_thread->priority < t->priority)
-		thread_yield();
-
-	intr_set_level(old_level);
 
 	/* Compare the priorities of the currently running thread
 	 * and the newly inserted one. Yield the CPU if the newly
@@ -373,6 +366,10 @@ tid_t thread_create(const char *name, int priority,
 	/* 현재 실행 중인 스레드와 새로 삽입된 스레드의 우선순위를
 	 * 비교합니다. 새로 도착한 스레드의 우선순위가 더 높으면
 	 * 스레드의 우선순위가 더 높으면 CPU를 양보합니다.*/
+	if (now_running_thread->priority < t->priority)
+		thread_yield();
+
+	intr_set_level(old_level);
 
 	return tid;
 }

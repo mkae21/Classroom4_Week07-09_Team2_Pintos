@@ -8,8 +8,7 @@
 #include "threads/mmu.h"
 #include "intrinsic.h"
 
-static uint64_t *
-pgdir_walk(uint64_t *pdp, const uint64_t va, int create)
+static uint64_t *pgdir_walk(uint64_t *pdp, const uint64_t va, int create)
 {
 	int idx = PDX(va);
 	if (pdp)
@@ -33,8 +32,7 @@ pgdir_walk(uint64_t *pdp, const uint64_t va, int create)
 	return NULL;
 }
 
-static uint64_t *
-pdpe_walk(uint64_t *pdpe, const uint64_t va, int create)
+static uint64_t *pdpe_walk(uint64_t *pdpe, const uint64_t va, int create)
 {
 	uint64_t *pte = NULL;
 	int idx = PDPE(va);
@@ -74,8 +72,12 @@ pdpe_walk(uint64_t *pdpe, const uint64_t va, int create)
  * on CREATE.  If CREATE is true, then a new page table is
  * created and a pointer into it is returned.  Otherwise, a null
  * pointer is returned. */
-uint64_t *
-pml4e_walk(uint64_t *pml4e, const uint64_t va, int create)
+/* 페이지 맵 레벨 4, pml4의 가상 주소 VADDR에 대한 페이지 테이블
+ * 항목의 주소를 반환합니다. PML4E에 VADDR에 대한 페이지 테이블이
+ * 없는 경우, 동작은 CREATE에 따라 달라집니다. CREATE가 참이면 새
+ * 페이지 테이블이 생성되고 해당 페이지 테이블에 대한 포인터가
+ * 반환됩니다. 그렇지 않으면 널 포인터가 반환됩니다. */
+uint64_t *pml4e_walk(uint64_t *pml4e, const uint64_t va, int create)
 {
 	uint64_t *pte = NULL;
 	int idx = PML4(va);
@@ -119,14 +121,17 @@ pml4e_walk(uint64_t *pml4e, const uint64_t va, int create)
 uint64_t *pml4_create(void)
 {
 	uint64_t *pml4 = palloc_get_page(0);
+
 	if (pml4)
+	{
 		memcpy(pml4, base_pml4, PGSIZE);
+	}
+
 	return pml4;
 }
 
-static bool
-pt_for_each(uint64_t *pt, pte_for_each_func *func, void *aux,
-			unsigned pml4_index, unsigned pdp_index, unsigned pdx_index)
+static bool pt_for_each(uint64_t *pt, pte_for_each_func *func, void *aux,
+						unsigned pml4_index, unsigned pdp_index, unsigned pdx_index)
 {
 	for (unsigned i = 0; i < PGSIZE / sizeof(uint64_t *); i++)
 	{
@@ -144,9 +149,8 @@ pt_for_each(uint64_t *pt, pte_for_each_func *func, void *aux,
 	return true;
 }
 
-static bool
-pgdir_for_each(uint64_t *pdp, pte_for_each_func *func, void *aux,
-			   unsigned pml4_index, unsigned pdp_index)
+static bool pgdir_for_each(uint64_t *pdp, pte_for_each_func *func, void *aux,
+						   unsigned pml4_index, unsigned pdp_index)
 {
 	for (unsigned i = 0; i < PGSIZE / sizeof(uint64_t *); i++)
 	{
@@ -159,9 +163,8 @@ pgdir_for_each(uint64_t *pdp, pte_for_each_func *func, void *aux,
 	return true;
 }
 
-static bool
-pdp_for_each(uint64_t *pdp,
-			 pte_for_each_func *func, void *aux, unsigned pml4_index)
+static bool pdp_for_each(uint64_t *pdp,
+						 pte_for_each_func *func, void *aux, unsigned pml4_index)
 {
 	for (unsigned i = 0; i < PGSIZE / sizeof(uint64_t *); i++)
 	{
@@ -175,6 +178,7 @@ pdp_for_each(uint64_t *pdp,
 }
 
 /* Apply FUNC to each available pte entries including kernel's. */
+/* 커널을 포함하여 사용 가능한 각 pte 항목에 FUNC를 적용합니다. */
 bool pml4_for_each(uint64_t *pml4, pte_for_each_func *func, void *aux)
 {
 	for (unsigned i = 0; i < PGSIZE / sizeof(uint64_t *); i++)
@@ -187,8 +191,7 @@ bool pml4_for_each(uint64_t *pml4, pte_for_each_func *func, void *aux)
 	return true;
 }
 
-static void
-pt_destroy(uint64_t *pt)
+static void pt_destroy(uint64_t *pt)
 {
 	for (unsigned i = 0; i < PGSIZE / sizeof(uint64_t *); i++)
 	{
@@ -199,8 +202,7 @@ pt_destroy(uint64_t *pt)
 	palloc_free_page((void *)pt);
 }
 
-static void
-pgdir_destroy(uint64_t *pdp)
+static void pgdir_destroy(uint64_t *pdp)
 {
 	for (unsigned i = 0; i < PGSIZE / sizeof(uint64_t *); i++)
 	{
@@ -211,8 +213,7 @@ pgdir_destroy(uint64_t *pdp)
 	palloc_free_page((void *)pdp);
 }
 
-static void
-pdpe_destroy(uint64_t *pdpe)
+static void pdpe_destroy(uint64_t *pdpe)
 {
 	for (unsigned i = 0; i < PGSIZE / sizeof(uint64_t *); i++)
 	{
@@ -299,6 +300,10 @@ bool pml4_set_page(uint64_t *pml4, void *upage, void *kpage, bool rw)
  * directory PD.  Later accesses to the page will fault.  Other
  * bits in the page table entry are preserved.
  * UPAGE need not be mapped. */
+/* 페이지 디렉터리 PD에 사용자 가상 페이지 업페이지를
+ * "존재하지 않음"으로 표시합니다. 나중에 페이지에 액세스하면
+ * 오류가 발생합니다. 페이지 테이블 항목의 다른 비트는 보존됩니다.
+ * UPAGE는 매핑할 필요가 없습니다. */
 void pml4_clear_page(uint64_t *pml4, void *upage)
 {
 	uint64_t *pte;
@@ -319,6 +324,9 @@ void pml4_clear_page(uint64_t *pml4, void *upage)
  * that is, if the page has been modified since the PTE was
  * installed.
  * Returns false if PML4 contains no PTE for VPAGE. */
+/* PML4의 가상 페이지 VPAGE에 대한 PTE가 깨끗하지 않다면,
+ * 즉 PTE가 설치된 이후 페이지가 수정되었다면 true를 반환합니다.
+ * PML4에 VPAGE에 대한 PTE가 없는 경우 false를 반환합니다. */
 bool pml4_is_dirty(uint64_t *pml4, const void *vpage)
 {
 	uint64_t *pte = pml4e_walk(pml4, (uint64_t)vpage, false);
@@ -327,6 +335,8 @@ bool pml4_is_dirty(uint64_t *pml4, const void *vpage)
 
 /* Set the dirty bit to DIRTY in the PTE for virtual page VPAGE
  * in PML4. */
+/* PML4의 가상 페이지 VPAGE에 대한 PTE에서 더티 비트를 DIRTY로
+ * 설정합니다. */
 void pml4_set_dirty(uint64_t *pml4, const void *vpage, bool dirty)
 {
 	uint64_t *pte = pml4e_walk(pml4, (uint64_t)vpage, false);
@@ -346,6 +356,9 @@ void pml4_set_dirty(uint64_t *pml4, const void *vpage, bool dirty)
  * accessed recently, that is, between the time the PTE was
  * installed and the last time it was cleared.  Returns false if
  * PML4 contains no PTE for VPAGE. */
+/* PML4의 가상 페이지 VPAGE에 대한 PTE가 최근에, 즉 PTE가 설치된
+ * 시점과 마지막으로 지워진 시점 사이에 액세스된 경우 true를
+ * 반환합니다. PML4에 VPAGE용 PTE가 없는 경우 false를 반환합니다. */
 bool pml4_is_accessed(uint64_t *pml4, const void *vpage)
 {
 	uint64_t *pte = pml4e_walk(pml4, (uint64_t)vpage, false);
@@ -354,6 +367,8 @@ bool pml4_is_accessed(uint64_t *pml4, const void *vpage)
 
 /* Sets the accessed bit to ACCESSED in the PTE for virtual page
    VPAGE in PD. */
+/* PD의 가상 페이지 VPAGE에 대한 PTE에서 액세스된 비트를
+   ACCESSED로 설정합니다. */
 void pml4_set_accessed(uint64_t *pml4, const void *vpage, bool accessed)
 {
 	uint64_t *pte = pml4e_walk(pml4, (uint64_t)vpage, false);

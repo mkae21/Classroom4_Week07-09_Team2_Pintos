@@ -10,6 +10,7 @@
 #endif
 
 // #define DEBUG_THREADS
+#define USERPROG
 
 #ifdef DEBUG_THREADS
 /* Prints FORMAT as if with printf(),
@@ -122,9 +123,6 @@ struct thread
 							   /* 우선순위를 기부한 스레드 목록. */
 	struct list_elem d_elem;   /* Donation list element. */
 							   /* 기부 리스트 요소. */
-
-	uint64_t *pml4; /* Page map level 4 */
-					/* 페이지 맵 레벨 4 */
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

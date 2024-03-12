@@ -182,6 +182,7 @@ vm_do_claim_page(struct page *page)
 }
 
 /* Initialize new supplemental page table */
+/* 새 보조 페이지 테이블 초기화 */
 void supplemental_page_table_init(struct supplemental_page_table *spt UNUSED)
 {
 }
@@ -193,7 +194,7 @@ bool supplemental_page_table_copy(struct supplemental_page_table *dst UNUSED,
 }
 
 /* Free the resource hold by the supplemental page table */
-/* 보충 페이지 표로 리소스 보유를 해제합니다. */
+/* 보조 페이지 테이블로 리소스 보유를 해제합니다. */
 void supplemental_page_table_kill(struct supplemental_page_table *spt UNUSED)
 {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
