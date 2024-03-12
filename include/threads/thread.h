@@ -10,7 +10,6 @@
 #endif
 
 // #define DEBUG_THREADS
-#define USERPROG
 
 #ifdef DEBUG_THREADS
 /* Prints FORMAT as if with printf(),

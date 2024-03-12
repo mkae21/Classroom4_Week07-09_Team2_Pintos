@@ -207,8 +207,6 @@ int process_exec(void *f_name)
 	char *file_name = f_name;
 	bool success = load(file_name, &_if);
 
-	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
-
 	/* If load failed, quit. */
 	/* 로드에 실패하면 종료합니다. */
 	palloc_free_page(file_name);
@@ -555,6 +553,52 @@ static bool load(const char *file_name, struct intr_frame *if_)
 
 	// 파싱을 위해서 매뉴얼에서는 strtok_r() 함수를 사용할 것을 권장하고 있기에, 이를 사용
 	// 사소하지만 중요한 사항으로, 포인터 변수의 크기가 8 바이트씩이라는 것을 잊지 말기
+	// process_exec() 함수 내부
+
+	// 1. file_name을 파싱하여 프로그램 이름과 인자들을 스택에 저장
+	// -> strtok_r() 함수를 사용하여 프로그램 이름과 인자들을 추출
+	char *save_ptr;
+	int argc = 0;
+	char *argv[LOADER_ARGS_LEN / 2 + 1];
+
+	for (char *token = strtok_r(file_name, " ", &save_ptr); token != NULL;
+		 token = strtok_r(NULL, " ", &save_ptr))
+	{
+		argv[argc++] = token;
+	}
+
+	// 2. 인자 문자열들은 스택의 최상단에 위치하도록 저장
+	// -> 추출한 프로그램 이름과 인자들을 스택에 저장하기 위함
+	void *stack_bottom = (void *)(((uint8_t *)USER_STACK) - PGSIZE);
+	char *stack_top = (char *)stack_bottom + PGSIZE;
+
+	for (int i = argc - 1; i >= 0; i--)
+	{
+		size_t len = strlen(argv[i]) + 1;
+		stack_top -= len;
+		memcpy(stack_top, argv[i], len);
+		argv[i] = stack_top;
+	}
+
+	// 3. 그 다음에 인자 문자열들의 주소를 담은 포인터 배열을 스택에 저장
+	// 이 배열의 끝은 NULL 포인터로 표시
+	size_t ptrs_size = (argc + 1) * sizeof(char *);
+	stack_top -= ptrs_size;
+	memcpy(stack_top, argv, ptrs_size);
+
+	// 4. 마지막으로 인자의 개수(argc)와 포인터 배열의 주소(argv)를 스택에 push
+	stack_top -= sizeof(char *);
+	memset(stack_top, 0, sizeof(char *));
+
+	stack_top -= sizeof(int);
+	memcpy(stack_top, &argc, sizeof(int));
+
+	// 5. if_의 rsi와 rdi 레지스터에 각각 argv와 argc의 값을 저장합니다.
+	if_->R.rsi = (uint64_t)stack_top;
+	if_->R.rdi = (uint64_t)argc;
+
+	// hex_dump 함수를 사용하여 스택 내용 출력
+	hex_dump((uintptr_t)stack_top, (const char *)stack_top, (int)((const char *)USER_STACK - stack_top), true);
 
 	success = true;
 

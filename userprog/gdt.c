@@ -20,8 +20,18 @@
  * Task-State Segment descriptors.  The former two types are
  * exactly what they sound like.  The TSS is used primarily for
  * stack switching on interrupts. */
-
-struct segment_desc {
+/* 글로벌 설명자 테이블(GDT). x86-64 전용 구조인 GDT는 권한에 따라
+ * 시스템의 모든 프로세스에서 잠재적으로 사용할 수 있는 세그먼트를
+ * 정의합니다. 프로세스별 LDT(로컬 설명자 테이블)도 있지만 최신
+ * 운영 체제에서는 사용되지 않습니다.
+ *
+ * 테이블의 바이트 오프셋으로 알려진 GDT의 각 항목은 세그먼트를
+ * 식별합니다. 여기서는 코드, 데이터, TSS 또는 작업 상태 세그먼트
+ * 설명자라는 세 가지 유형의 세그먼트에만 관심을 두고 있습니다.
+ * 앞의 두 가지 유형은 말 그대로입니다. TSS는 주로 인터럽트에서
+ * 스택 전환에 사용됩니다. */
+struct segment_desc
+{
 	unsigned lim_15_0 : 16;
 	unsigned base_15_0 : 16;
 	unsigned base_23_16 : 8;
@@ -37,7 +47,8 @@ struct segment_desc {
 	unsigned base_31_24 : 8;
 };
 
-struct segment_descriptor64 {
+struct segment_descriptor64
+{
 	unsigned lim_15_0 : 16;
 	unsigned base_15_0 : 16;
 	unsigned base_23_16 : 8;
@@ -56,45 +67,51 @@ struct segment_descriptor64 {
 	unsigned res2 : 16;
 };
 
-#define SEG64(type, base, lim, dpl) (struct segment_desc) \
-{ ((lim) >> 12) & 0xffff, (base) & 0xffff, ((base) >> 16) & 0xff, \
-	type, 1, dpl, 1, (unsigned) (lim) >> 28, 0, 1, 0, 1, \
-	(unsigned) (base) >> 24 }
+#define SEG64(type, base, lim, dpl)                                     \
+	(struct segment_desc)                                               \
+	{                                                                   \
+		((lim) >> 12) & 0xffff, (base) & 0xffff, ((base) >> 16) & 0xff, \
+			type, 1, dpl, 1, (unsigned)(lim) >> 28, 0, 1, 0, 1,         \
+			(unsigned)(base) >> 24                                      \
+	}
 
 static struct segment_desc gdt[SEL_CNT] = {
-	[SEL_NULL >> 3] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-	[SEL_KCSEG >> 3] = SEG64 (0xa, 0x0, 0xffffffff, 0),
-	[SEL_KDSEG >> 3] = SEG64 (0x2, 0x0, 0xffffffff, 0),
-	[SEL_UDSEG >> 3] = SEG64 (0x2, 0x0, 0xffffffff, 3),
-	[SEL_UCSEG >> 3] = SEG64 (0xa, 0x0, 0xffffffff, 3),
-	[SEL_TSS >> 3] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-	[6] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
-	[7] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+	[SEL_NULL >> 3] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	[SEL_KCSEG >> 3] = SEG64(0xa, 0x0, 0xffffffff, 0),
+	[SEL_KDSEG >> 3] = SEG64(0x2, 0x0, 0xffffffff, 0),
+	[SEL_UDSEG >> 3] = SEG64(0x2, 0x0, 0xffffffff, 3),
+	[SEL_UCSEG >> 3] = SEG64(0xa, 0x0, 0xffffffff, 3),
+	[SEL_TSS >> 3] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	[6] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+	[7] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 };
 
 struct desc_ptr gdt_ds = {
 	.size = sizeof(gdt) - 1,
-	.address = (uint64_t) gdt
-};
+	.address = (uint64_t)gdt};
 
 /* Sets up a proper GDT.  The bootstrap loader's GDT didn't
    include user-mode selectors or a TSS, but we need both now. */
-void
-gdt_init (void) {
+/* 적절한 GDT를 설정합니다. 부트스트랩 로더의 GDT에는
+   사용자 모드 선택기나 TSS가 포함되어 있지 않았지만
+   지금은 이 두 가지가 모두 필요합니다. */
+void gdt_init(void)
+{
 	/* Initialize GDT. */
+	/* GDT를 초기화합니다. */
 	struct segment_descriptor64 *tss_desc =
-		(struct segment_descriptor64 *) &gdt[SEL_TSS >> 3];
-	struct task_state *tss = tss_get ();
+		(struct segment_descriptor64 *)&gdt[SEL_TSS >> 3];
+	struct task_state *tss = tss_get();
 
-	*tss_desc = (struct segment_descriptor64) {
-		.lim_15_0 = (uint64_t) (sizeof (struct task_state)) & 0xffff,
-		.base_15_0 = (uint64_t) (tss) & 0xffff,
-		.base_23_16 = ((uint64_t) (tss) >> 16) & 0xff,
+	*tss_desc = (struct segment_descriptor64){
+		.lim_15_0 = (uint64_t)(sizeof(struct task_state)) & 0xffff,
+		.base_15_0 = (uint64_t)(tss) & 0xffff,
+		.base_23_16 = ((uint64_t)(tss) >> 16) & 0xff,
 		.type = 0x9,
 		.s = 0,
 		.dpl = 0,
 		.p = 1,
-		.lim_19_16 = ((uint64_t)(sizeof (struct task_state)) >> 16) & 0xf,
+		.lim_19_16 = ((uint64_t)(sizeof(struct task_state)) >> 16) & 0xf,
 		.avl = 0,
 		.rsv1 = 0,
 		.g = 0,
@@ -102,21 +119,22 @@ gdt_init (void) {
 		.base_63_32 = ((uint64_t)(tss) >> 32) & 0xffffffff,
 		.res1 = 0,
 		.clear = 0,
-		.res2 = 0
-	};
+		.res2 = 0};
 
-	lgdt (&gdt_ds);
+	lgdt(&gdt_ds);
 	/* reload segment registers */
-	asm volatile("movw %%ax, %%gs" :: "a" (SEL_UDSEG));
-	asm volatile("movw %%ax, %%fs" :: "a" (0));
-	asm volatile("movw %%ax, %%es" :: "a" (SEL_KDSEG));
-	asm volatile("movw %%ax, %%ds" :: "a" (SEL_KDSEG));
-	asm volatile("movw %%ax, %%ss" :: "a" (SEL_KDSEG));
+	/* 세그먼트 레지스터를 다시 로드 */
+	asm volatile("movw %%ax, %%gs" ::"a"(SEL_UDSEG));
+	asm volatile("movw %%ax, %%fs" ::"a"(0));
+	asm volatile("movw %%ax, %%es" ::"a"(SEL_KDSEG));
+	asm volatile("movw %%ax, %%ds" ::"a"(SEL_KDSEG));
+	asm volatile("movw %%ax, %%ss" ::"a"(SEL_KDSEG));
 	asm volatile("pushq %%rbx\n"
-			"movabs $1f, %%rax\n"
-			"pushq %%rax\n"
-			"lretq\n"
-			"1:\n" :: "b" (SEL_KCSEG):"cc","memory");
+				 "movabs $1f, %%rax\n"
+				 "pushq %%rax\n"
+				 "lretq\n"
+				 "1:\n" ::"b"(SEL_KCSEG) : "cc", "memory");
 	/* Kill the local descriptor table */
-	lldt (0);
+	/* 로컬 descriptor 테이블 종료 */
+	lldt(0);
 }
