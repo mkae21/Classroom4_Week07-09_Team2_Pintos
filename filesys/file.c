@@ -4,20 +4,26 @@
 #include "threads/malloc.h"
 
 /* An open file. */
+/* 열린 파일입니다. */
 struct file
 {
 	struct inode *inode; /* File's inode. */
+						 /* 파일의 이노드. */
 	off_t pos;			 /* Current position. */
+						 /* 현재 위치. */
 	bool deny_write;	 /* Has file_deny_write() been called? */
+						 /* file_deny_write()가 호출되었습니까? */
 };
 
 /* Opens a file for the given INODE, of which it takes ownership,
  * and returns the new file.  Returns a null pointer if an
  * allocation fails or if INODE is null. */
-struct file *
-file_open(struct inode *inode)
+/* 지정된 INODE에 대한 파일을 열고 소유권을 가져온 후 새 파일을 반환합니다.
+ * 할당이 실패하거나 INODE가 널이면 널 포인터를 반환합니다. */
+struct file *file_open(struct inode *inode)
 {
 	struct file *file = calloc(1, sizeof *file);
+
 	if (inode != NULL && file != NULL)
 	{
 		file->inode = inode;
@@ -25,12 +31,11 @@ file_open(struct inode *inode)
 		file->deny_write = false;
 		return file;
 	}
-	else
-	{
-		inode_close(inode);
-		free(file);
-		return NULL;
-	}
+
+	inode_close(inode);
+	free(file);
+
+	return NULL;
 }
 
 /* Opens and returns a new file for the same inode as FILE.
