@@ -123,9 +123,6 @@ struct thread
 	struct list_elem d_elem;   /* Donation list element. */
 							   /* 기부 리스트 요소. */
 
-	uint64_t *pml4; /* Page map level 4 */
-					/* 페이지 맵 레벨 4 */
-
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	/* 소유: userprog/process.c. */

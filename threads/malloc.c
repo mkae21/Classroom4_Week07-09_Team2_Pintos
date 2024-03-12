@@ -169,20 +169,23 @@ void *malloc(size_t size)
    메모리를 사용할 수 없는 경우 널 포인터를 반환합니다. */
 void *calloc(size_t a, size_t b)
 {
-	void *p;
-	size_t size;
-
 	/* Calculate block size and make sure it fits in size_t. */
 	/* 블록 크기를 계산하고 size_t에 맞는지 확인합니다. */
-	size = a * b;
+	size_t size = a * b;
+
 	if (size < a || size < b)
+	{
 		return NULL;
+	}
 
 	/* Allocate and zero memory. */
 	/* 메모리를 할당하고 제로화합니다. */
-	p = malloc(size);
+	void *p = malloc(size);
+
 	if (p != NULL)
+	{
 		memset(p, 0, size);
+	}
 
 	return p;
 }

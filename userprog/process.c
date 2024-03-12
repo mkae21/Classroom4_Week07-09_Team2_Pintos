@@ -39,28 +39,41 @@ static void process_init(void)
  * before process_create_initd() returns. Returns the initd's
  * thread id, or TID_ERROR if the thread cannot be created.
  * Notice that THIS SHOULD BE CALLED ONCE. */
+/* 파일 이름에서 로드한 "initd"라는 첫 번째 유저랜드 프로그램을 시작합니다.
+ * process_create_initd()가 반환되기 전에 새 스레드가 예약될 수 있으며
+ * 종료될 수도 있습니다. initd의 스레드 ID를 반환하거나, 스레드를 생성할 수
+ * 없는 경우 TID_ERROR를 반환합니다.
+ * 이 함수는 한 번만 호출해야 한다는 점에 유의하세요. */
 tid_t process_create_initd(const char *file_name)
 {
-	char *fn_copy;
-	tid_t tid;
-
 	/* Make a copy of FILE_NAME.
 	 * Otherwise there's a race between the caller and load(). */
-	fn_copy = palloc_get_page(0);
+	/* FILE_NAME의 복사본을 만듭니다.
+	 * 그렇지 않으면 호출자와 load() 사이에 경합이 발생합니다. */
+	char *fn_copy = palloc_get_page(0);
+
 	if (fn_copy == NULL)
+	{
 		return TID_ERROR;
+	}
+
 	strlcpy(fn_copy, file_name, PGSIZE);
 
 	/* Create a new thread to execute FILE_NAME. */
-	tid = thread_create(file_name, PRI_DEFAULT, initd, fn_copy);
+	/* FILE_NAME을 실행할 새 스레드를 생성합니다. */
+	tid_t tid = thread_create(file_name, PRI_DEFAULT, initd, fn_copy);
+
 	if (tid == TID_ERROR)
+	{
 		palloc_free_page(fn_copy);
+	}
+
 	return tid;
 }
 
 /* A thread function that launches first user process. */
-static void
-initd(void *f_name)
+/* 첫 번째 사용자 프로세스를 실행하는 스레드 함수입니다. */
+static void initd(void *f_name)
 {
 #ifdef VM
 	supplemental_page_table_init(&thread_current()->spt);
@@ -69,7 +82,11 @@ initd(void *f_name)
 	process_init();
 
 	if (process_exec(f_name) < 0)
+	{
 		PANIC("Fail to launch initd\n");
+		PANIC("`initd` 실행 실패\n");
+	}
+
 	NOT_REACHED();
 }
 
@@ -169,9 +186,6 @@ error:
  * 실패하면 -1을 반환합니다. */
 int process_exec(void *f_name)
 {
-	char *file_name = f_name;
-	bool success;
-
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
@@ -179,6 +193,7 @@ int process_exec(void *f_name)
 	 * 현재 스레드가 스케줄을 변경할 때
 	 * 실행 정보를 멤버에 저장하기 때문입니다. */
 	struct intr_frame _if;
+
 	_if.ds = _if.es = _if.ss = SEL_UDSEG;
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
@@ -189,13 +204,17 @@ int process_exec(void *f_name)
 
 	/* And then load the binary */
 	/* 그런 다음 바이너리를 로드합니다. */
-	success = load(file_name, &_if);
+	char *file_name = f_name;
+	bool success = load(file_name, &_if);
 
 	/* If load failed, quit. */
 	/* 로드에 실패하면 종료합니다. */
 	palloc_free_page(file_name);
+
 	if (!success)
+	{
 		return -1;
+	}
 
 	/* Start switched process. */
 	/* 전환된 프로세스를 시작합니다. */
@@ -256,12 +275,12 @@ static void process_cleanup(void)
 	supplemental_page_table_kill(&curr->spt);
 #endif
 
-	uint64_t *pml4;
 	/* Destroy the current process's page directory and switch back
 	 * to the kernel-only page directory. */
 	/* 현재 프로세스의 페이지 디렉터리를 삭제하고
 	 * 커널 전용 페이지 디렉터리로 다시 전환합니다. */
-	pml4 = curr->pml4;
+	uint64_t *pml4 = curr->pml4;
+
 	if (pml4 != NULL)
 	{
 		/* Correct ordering here is crucial.  We must set
@@ -279,6 +298,7 @@ static void process_cleanup(void)
 		 * 않으면 활성 페이지 디렉터리가 해제된(그리고 지워진)
 		 * 디렉터리가 됩니다. */
 		curr->pml4 = NULL;
+
 		pml4_activate(NULL);
 		pml4_destroy(pml4);
 	}
@@ -387,23 +407,29 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
  * 성공하면 참을 반환하고, 그렇지 않으면 거짓을 반환합니다. */
 static bool load(const char *file_name, struct intr_frame *if_)
 {
-	struct thread *t = thread_current();
-	struct ELF ehdr;
-	struct file *file = NULL;
-	off_t file_ofs;
+	// 실행할 프로그램의 binary 파일을 메모리에 올리는 역할 수행
 	bool success = false;
-	int i;
+	struct thread *t = thread_current();
 
 	/* Allocate and activate page directory. */
 	/* 페이지 디렉토리를 할당하고 활성화합니다. */
+
+	// 각 프로세스가 실행이 될 때, 각 프로세스에 해당하는 VM(virtual memory)이 만들어져 함
+	// 이를 위해 페이지 테이블 엔트리를 생성하는 과정이 우선적으로 필요
+	// 그 뒤, 파일을 실제로 VM에 올리는 과정 진행
 	t->pml4 = pml4_create();
+
 	if (t->pml4 == NULL)
+	{
 		goto done;
+	}
+
 	process_activate(thread_current());
 
 	/* Open executable file. */
 	/* 실행 파일을 엽니다. */
-	file = filesys_open(file_name);
+	struct file *file = filesys_open(file_name);
+
 	if (file == NULL)
 	{
 		// printf("load: %s: open failed\n", file_name);
@@ -413,6 +439,8 @@ static bool load(const char *file_name, struct intr_frame *if_)
 
 	/* Read and verify executable header. */
 	/* 실행 파일 헤더를 읽고 확인합니다. */
+	struct ELF ehdr;
+
 	if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr || memcmp(ehdr.e_ident, "\177ELF\2\1\1", 7) || ehdr.e_type != 2 || ehdr.e_machine != 0x3E // amd64
 		|| ehdr.e_version != 1 || ehdr.e_phentsize != sizeof(struct Phdr) || ehdr.e_phnum > 1024)
 	{
@@ -423,18 +451,26 @@ static bool load(const char *file_name, struct intr_frame *if_)
 
 	/* Read program headers. */
 	/* 프로그램 헤더를 읽습니다. */
-	file_ofs = ehdr.e_phoff;
-	for (i = 0; i < ehdr.e_phnum; i++)
-	{
-		struct Phdr phdr;
+	off_t file_ofs = ehdr.e_phoff;
 
+	for (int i = 0; i < ehdr.e_phnum; ++i)
+	{
 		if (file_ofs < 0 || file_ofs > file_length(file))
+		{
 			goto done;
+		}
+
 		file_seek(file, file_ofs);
 
+		struct Phdr phdr;
+
 		if (file_read(file, &phdr, sizeof phdr) != sizeof phdr)
+		{
 			goto done;
+		}
+
 		file_ofs += sizeof phdr;
+
 		switch (phdr.p_type)
 		{
 		case PT_NULL:
@@ -443,13 +479,15 @@ static bool load(const char *file_name, struct intr_frame *if_)
 		case PT_STACK:
 		default:
 			/* Ignore this segment. */
-			/* 이 세그먼트는 무시하세요. */
+			/* 이 세그먼트는 무시. */
 			break;
 		case PT_DYNAMIC:
 		case PT_INTERP:
 		case PT_SHLIB:
 			goto done;
 		case PT_LOAD:
+			// 파일이 제대로 된 ELF 인지 검사하는 과정을 동반
+			// 세그먼트 단위로 PT_LOAD의 헤더 타입을 가진 부분을 하나씩 메모리로 올림
 			if (validate_segment(&phdr, file))
 			{
 				bool writable = (phdr.p_flags & PF_W) != 0;
@@ -457,6 +495,7 @@ static bool load(const char *file_name, struct intr_frame *if_)
 				uint64_t mem_page = phdr.p_vaddr & ~PGMASK;
 				uint64_t page_offset = phdr.p_vaddr & PGMASK;
 				uint32_t read_bytes, zero_bytes;
+
 				if (phdr.p_filesz > 0)
 				{
 					/* Normal segment.
@@ -475,23 +514,32 @@ static bool load(const char *file_name, struct intr_frame *if_)
 					read_bytes = 0;
 					zero_bytes = ROUND_UP(page_offset + phdr.p_memsz, PGSIZE);
 				}
+
 				if (!load_segment(file, file_page, (void *)mem_page,
 								  read_bytes, zero_bytes, writable))
+				{
 					goto done;
+				}
 			}
 			else
+			{
 				goto done;
+			}
 			break;
 		}
 	}
 
 	/* Set up stack. */
 	/* 스택을 설정합니다. */
+	// 전부 메모리로 올린 뒤에 스택을 만드는 과정이 실행
 	if (!setup_stack(if_))
+	{
 		goto done;
+	}
 
 	/* Start address. */
 	/* 시작 주소. */
+	// 어떤 명령부터 실행되는지를 가리키는, 즉 entry point 역할의 rip를 설정
 	if_->rip = ehdr.e_entry;
 
 	/* TODO: Your code goes here.
@@ -499,11 +547,66 @@ static bool load(const char *file_name, struct intr_frame *if_)
 	/* 할 일: 코드가 여기로 이동합니다.
 	 * 할 일: 인수 전달을 구현합니다. (project2/argument_passing.html 참조) */
 
+	// 들어온 입력을 파싱해 USER_STACK에 채워넣는 루틴 추가
+	// 만약 입력으로 들어오는 명령이 argument를 포함하고 있다면 load()의 코드에서 filename이 이제 진정한 파일의 이름이 아닐 수 있음
+	// 순수한 실행 파일의 이름을 얻어내기 위해서, 파싱 자체는 load() 함수의 시작 즈음에 이루어져야 함
+
+	// 파싱을 위해서 매뉴얼에서는 strtok_r() 함수를 사용할 것을 권장하고 있기에, 이를 사용
+	// 사소하지만 중요한 사항으로, 포인터 변수의 크기가 8 바이트씩이라는 것을 잊지 말기
+	// process_exec() 함수 내부
+
+	// 1. file_name을 파싱하여 프로그램 이름과 인자들을 스택에 저장
+	// -> strtok_r() 함수를 사용하여 프로그램 이름과 인자들을 추출
+	char *save_ptr;
+	int argc = 0;
+	char *argv[LOADER_ARGS_LEN / 2 + 1];
+
+	for (char *token = strtok_r(file_name, " ", &save_ptr); token != NULL;
+		 token = strtok_r(NULL, " ", &save_ptr))
+	{
+		argv[argc++] = token;
+	}
+
+	// 2. 인자 문자열들은 스택의 최상단에 위치하도록 저장
+	// -> 추출한 프로그램 이름과 인자들을 스택에 저장하기 위함
+	void *stack_bottom = (void *)(((uint8_t *)USER_STACK) - PGSIZE);
+	char *stack_top = (char *)stack_bottom + PGSIZE;
+
+	for (int i = argc - 1; i >= 0; i--)
+	{
+		size_t len = strlen(argv[i]) + 1;
+		stack_top -= len;
+		memcpy(stack_top, argv[i], len);
+		argv[i] = stack_top;
+	}
+
+	// 3. 그 다음에 인자 문자열들의 주소를 담은 포인터 배열을 스택에 저장
+	// 이 배열의 끝은 NULL 포인터로 표시
+	size_t ptrs_size = (argc + 1) * sizeof(char *);
+	stack_top -= ptrs_size;
+	memcpy(stack_top, argv, ptrs_size);
+
+	// 4. 마지막으로 인자의 개수(argc)와 포인터 배열의 주소(argv)를 스택에 push
+	stack_top -= sizeof(char *);
+	memset(stack_top, 0, sizeof(char *));
+
+	stack_top -= sizeof(int);
+	memcpy(stack_top, &argc, sizeof(int));
+
+	// 5. if_의 rsi와 rdi 레지스터에 각각 argv와 argc의 값을 저장합니다.
+	if_->R.rsi = (uint64_t)stack_top;
+	if_->R.rdi = (uint64_t)argc;
+
+	// hex_dump 함수를 사용하여 스택 내용 출력
+	hex_dump((uintptr_t)stack_top, (const char *)stack_top, (int)((const char *)USER_STACK - stack_top), true);
+
 	success = true;
 
 done:
 	/* We arrive here whether the load is successful or not. */
 	/* 로드 성공 여부와 상관없이 여기에 도착합니다. */
+
+	// 열었던 실행 파일을 닫음
 	file_close(file);
 	return success;
 }
@@ -658,18 +761,23 @@ static bool load_segment(struct file *file, off_t ofs, uint8_t *upage,
 /* USER_STACK에서 제로화된 페이지를 매핑하여 최소 스택을 생성합니다. */
 static bool setup_stack(struct intr_frame *if_)
 {
-	uint8_t *kpage;
 	bool success = false;
+	uint8_t *kpage = palloc_get_page(PAL_USER | PAL_ZERO);
 
-	kpage = palloc_get_page(PAL_USER | PAL_ZERO);
 	if (kpage != NULL)
 	{
 		success = install_page(((uint8_t *)USER_STACK) - PGSIZE, kpage, true);
+
 		if (success)
+		{
 			if_->rsp = USER_STACK;
+		}
 		else
+		{
 			palloc_free_page(kpage);
+		}
 	}
+
 	return success;
 }
 
