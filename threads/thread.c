@@ -90,6 +90,8 @@ static void kernel_thread(thread_func *, void *aux);
 
 static void idle(void *aux UNUSED);
 static struct thread *next_thread_to_run(void);
+// TODO: Initializes data structure for priority donation.
+// TODO: 우선순위 기부를 위한 자료 구조를 초기화합니다.
 static void init_thread(struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule(void);
@@ -118,6 +120,19 @@ static tid_t allocate_tid(void);
 // gdt는 thread_init 이후에 설정되므로 임시 gdt를 먼저 설정해야 합니다.
 static uint64_t gdt[3] = {0, 0x00af9a000000ffff, 0x00cf92000000ffff};
 
+void debug_msg(const char *format, ...)
+{
+#ifdef DEBUG_THREADS
+	va_list args;
+
+	printf("[DEBUG] thread_name: %s, ", thread_current()->name);
+	va_start(args, format);
+	vprintf(format, args);
+	va_end(args);
+	putchar('\n');
+#endif
+}
+
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -144,16 +159,20 @@ bool local_tick(const struct list_elem *a, const struct list_elem *b, void *aux)
 	else
 		return false;
 }
+
 bool larger(const struct list_elem *a, const struct list_elem *b, void *aux)
 {
 	struct thread *A = list_entry(a, struct thread, elem);
 	struct thread *B = list_entry(b, struct thread, elem);
 
-    if (A->priority > B->priority){
-        return true;
-    }
-    else return false;
-
+	if (A->priority > B->priority)
+	{
+		return true;
+	}
+	else
+	{
+		return false;
+	}
 }
 /* 현재 실행 중인 코드를 스레드로 변환하여 스레딩 시스템을 초기화합니다.
    일반적으로는 작동하지 않으며 이 경우에만 가능한 이유는 loader.S가
@@ -187,7 +206,6 @@ void thread_init(void)
 	lock_init(&tid_lock);
 	list_init(&ready_list);
 	list_init(&sleep_list);
-	
 	list_init(&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -246,27 +264,25 @@ void thread_tick(void)
 		intr_yield_on_return();
 }
 
-
-
-void thread_wakeup(int64_t tick)
+void thread_wakeup(int64_t ticks)
 {
-    if (list_empty(&sleep_list))
-        return;
-    enum intr_level old_level;
-    struct thread *to_wakeup = list_entry(list_front(&sleep_list), struct thread, elem);
-    old_level = intr_disable();
-    while (to_wakeup->tick <= tick)
-    {
-        list_pop_front(&sleep_list);
+	if (list_empty(&sleep_list))
+		return;
+	enum intr_level old_level;
+	struct thread *to_wakeup = list_entry(list_front(&sleep_list), struct thread, elem);
+	old_level = intr_disable();
+	while (to_wakeup->tick <= ticks)
+	{
+
+		list_pop_front(&sleep_list);
 		// list_push_back (&ready_list, &to_wakeup->elem);
 		list_insert_ordered(&ready_list, &to_wakeup->elem, (list_less_func *)larger, NULL);
 		to_wakeup->status = THREAD_READY;
-
 		if (list_empty(&sleep_list))
 			return;
 		to_wakeup = list_entry(list_front(&sleep_list), struct thread, elem);
 	}
-
+	// printf("%lld \n", to_wakeup->wakeup_tick);
 	intr_set_level(old_level);
 }
 
@@ -294,7 +310,7 @@ void thread_print_stats(void)
    PRIORITY, but no actual priority scheduling is implemented.
    Priority scheduling is the goal of Problem 1-3. */
 /* 주어진 초기 우선순위를 가진 NAME이라는 이름의 새 커널 스레드를
-   생성하고, AUX를 인수로 전달하는 FUNCTION을 실행한 후 준비 큐에
+   생성하고, AUX를 인수로 전달하는 FUNCTION을 실행한 후 ready queue에
    추가합니다. 새 스레드의 스레드 식별자를 반환하거나 생성에
    실패하면 TID_ERROR를 반환합니다.
 
@@ -340,17 +356,23 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.eflags = FLAG_IF;
 
 	/* Add to run queue. */
-	thread_unblock (t);
+	thread_unblock(t);
 	enum intr_level old_level;
 	old_level = intr_disable();
 
 	struct thread *now_running_thread = thread_current();
 
-	if(now_running_thread->priority < t->priority)
+	if (now_running_thread->priority < t->priority)
 		thread_yield();
-		
-	
+
 	intr_set_level(old_level);
+
+	/* Compare the priorities of the currently running thread
+	 * and the newly inserted one. Yield the CPU if the newly
+	 * arriving thread has higher priority. */
+	/* 현재 실행 중인 스레드와 새로 삽입된 스레드의 우선순위를
+	 * 비교합니다. 새로 도착한 스레드의 우선순위가 더 높으면
+	 * 스레드의 우선순위가 더 높으면 CPU를 양보합니다.*/
 
 	return tid;
 }
@@ -395,11 +417,10 @@ void thread_unblock(struct thread *t)
 
 	ASSERT(is_thread(t));
 
+	old_level = intr_disable();
+	ASSERT(t->status == THREAD_BLOCKED);
+	list_insert_ordered(&ready_list, &t->elem, (list_less_func *)larger, NULL);
 
-	old_level = intr_disable ();
-	ASSERT (t->status == THREAD_BLOCKED);
-	// list_push_back (&ready_list, &t->elem);
-	list_insert_ordered(&ready_list , &t->elem , (list_less_func *)larger , NULL);
 	t->status = THREAD_READY;
 	intr_set_level(old_level);
 }
@@ -483,14 +504,14 @@ void thread_yield(void)
 	{
 		// ready_list의 제일 뒤에 보냄
 		// list_push_back (&ready_list, &curr->elem);
-		list_insert_ordered(&ready_list , &curr->elem , (list_less_func *)larger , NULL);
-  }
-    
-    // ready 상태로 바꿔줌
-	  do_schedule (THREAD_READY);
-  
-    // old_level 값에 맞춰서 enable or disable
-	  intr_set_level (old_level);
+		list_insert_ordered(&ready_list, &curr->elem, (list_less_func *)larger, NULL);
+	}
+
+	// ready 상태로 바꿔줌
+	do_schedule(THREAD_READY);
+
+	// old_level 값에 맞춰서 enable or disable
+	intr_set_level(old_level);
 }
 
 // 추후 Project1 완료 후 성능 Test를 위해 백업 - Hyeonwoo, 2024.03.06
@@ -585,7 +606,6 @@ void thread_yield(void)
 
 void thread_sleep(int64_t ticks)
 {
-
 	struct thread *curr = thread_current();
 	enum intr_level old_level;
 	old_level = intr_disable();
@@ -601,13 +621,17 @@ void thread_sleep(int64_t ticks)
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
-void
-thread_set_priority (int new_priority)
+/* 현재 스레드의 우선순위를 NEW_PRIORITY로 설정합니다. */
+void thread_set_priority(int new_priority)
 {
+	// TODO: Set priority of the current thread.
+	// TODO: Reorder the ready_list.
+	// TODO: 현재 스레드의 우선순위를 설정합니다.
+	// TODO: ready_list의 순서를 바꿉니다.
 	thread_current()->origin_priority = new_priority;
-	if (list_empty(&thread_current()->donations)) 
+	if (list_empty(&thread_current()->donations))
 		thread_current()->priority = new_priority;
-	
+
 	if (!list_empty(&ready_list) && list_entry(list_front(&ready_list), struct thread, elem)->priority > new_priority)
 		thread_yield();
 }
@@ -739,6 +763,8 @@ static void init_thread(struct thread *t, const char *name, int priority)
 	// for switching
 	t->tf.rsp = (uint64_t)t + PGSIZE - sizeof(void *);
 	t->priority = priority;
+	// 현재 대기하고 있는 락을 가리키는 포인터이므로,
+	// 초기에는 어떤 락에도 대기하지 않는 상태(NULL)로 설정
 	t->origin_priority = priority;
 	// for checking stackover flow
 	t->magic = THREAD_MAGIC;
@@ -980,19 +1006,3 @@ bool compare_priority(const struct list_elem *a_, const struct list_elem *b_,
 
 	return a->priority > b->priority;
 }
-
-// /*Sets the current thread's priority to new priority.
-// If the current thread no longer has the highest priority, yields.*/
-// void thread_create(int new_priority){
-// 	/*running thread*/
-// 	int running_priorty	= thread_get_priority();
-
-// 	// enum intr_level oldlevel = intr_disable();
-
-// 	/*recently inserted thread
-// 	즉,최근 ready_list에 들어간 thread*/
-// 	if(running_priorty < recent_out->priority){
-// 		thread_yield();
-// 	}
-
-// }
