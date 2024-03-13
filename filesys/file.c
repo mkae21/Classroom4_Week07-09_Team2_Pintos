@@ -40,24 +40,27 @@ struct file *file_open(struct inode *inode)
 
 /* Opens and returns a new file for the same inode as FILE.
  * Returns a null pointer if unsuccessful. */
-struct file *
-file_reopen(struct file *file)
+struct file *file_reopen(struct file *file)
 {
 	return file_open(inode_reopen(file->inode));
 }
 
 /* Duplicate the file object including attributes and returns a new file for the
  * same inode as FILE. Returns a null pointer if unsuccessful. */
-struct file *
-file_duplicate(struct file *file)
+struct file *file_duplicate(struct file *file)
 {
 	struct file *nfile = file_open(inode_reopen(file->inode));
+
 	if (nfile)
 	{
 		nfile->pos = file->pos;
+
 		if (file->deny_write)
+		{
 			file_deny_write(nfile);
+		}
 	}
+
 	return nfile;
 }
 
@@ -74,8 +77,7 @@ void file_close(struct file *file)
 }
 
 /* Returns the inode encapsulated by FILE. */
-struct inode *
-file_get_inode(struct file *file)
+struct inode *file_get_inode(struct file *file)
 {
 	return file->inode;
 }
@@ -117,6 +119,7 @@ off_t file_write(struct file *file, const void *buffer, off_t size)
 {
 	off_t bytes_written = inode_write_at(file->inode, buffer, size, file->pos);
 	file->pos += bytes_written;
+
 	return bytes_written;
 }
 
@@ -138,6 +141,7 @@ off_t file_write_at(struct file *file, const void *buffer, off_t size,
 void file_deny_write(struct file *file)
 {
 	ASSERT(file != NULL);
+
 	if (!file->deny_write)
 	{
 		file->deny_write = true;
@@ -151,6 +155,7 @@ void file_deny_write(struct file *file)
 void file_allow_write(struct file *file)
 {
 	ASSERT(file != NULL);
+
 	if (file->deny_write)
 	{
 		file->deny_write = false;
@@ -162,6 +167,7 @@ void file_allow_write(struct file *file)
 off_t file_length(struct file *file)
 {
 	ASSERT(file != NULL);
+
 	return inode_length(file->inode);
 }
 
@@ -173,6 +179,7 @@ void file_seek(struct file *file, off_t new_pos)
 {
 	ASSERT(file != NULL);
 	ASSERT(new_pos >= 0);
+
 	file->pos = new_pos;
 }
 
