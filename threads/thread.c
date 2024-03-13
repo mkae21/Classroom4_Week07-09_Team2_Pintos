@@ -120,19 +120,6 @@ static tid_t allocate_tid(void);
 // gdt는 thread_init 이후에 설정되므로 임시 gdt를 먼저 설정해야 합니다.
 static uint64_t gdt[3] = {0, 0x00af9a000000ffff, 0x00cf92000000ffff};
 
-void debug_msg(const char *format, ...)
-{
-#ifdef DEBUG_THREADS
-	va_list args;
-
-	printf("[DEBUG] thread_name: %s, ", thread_current()->name);
-	va_start(args, format);
-	vprintf(format, args);
-	va_end(args);
-	putchar('\n');
-#endif
-}
-
 /* Initializes the threading system by transforming the code
    that's currently running into a thread.  This can't work in
    general and it is possible in this case only because loader.S
@@ -450,6 +437,7 @@ struct thread *thread_current(void)
 	   스택은 4KB 미만이므로 몇 개의 큰 자동 배열이나 중간 정도의 재귀가
 	   스택 오버플로를 일으킬 수 있습니다. */
 	ASSERT(is_thread(t));
+	debug_msg("t->status: %d", t->status);
 	ASSERT(t->status == THREAD_RUNNING);
 
 	return t;
@@ -766,6 +754,12 @@ static void init_thread(struct thread *t, const char *name, int priority)
 	// for checking stackover flow
 	t->magic = THREAD_MAGIC;
 	list_init(&t->donations);
+
+#ifdef USERPROG
+	t->pml4 = pml4_create();
+	sema_init(&t->wait_sema, 0);
+	t->exit_status = 0;
+#endif
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -910,12 +904,13 @@ static void do_schedule(int status)
 {
 	ASSERT(intr_get_level() == INTR_OFF);
 	ASSERT(thread_current()->status == THREAD_RUNNING);
+
 	while (!list_empty(&destruction_req))
 	{
-		struct thread *victim =
-			list_entry(list_pop_front(&destruction_req), struct thread, elem);
+		struct thread *victim = list_entry(list_pop_front(&destruction_req), struct thread, elem);
 		palloc_free_page(victim);
 	}
+
 	thread_current()->status = status;
 	schedule();
 }
@@ -1002,3 +997,22 @@ bool compare_priority(const struct list_elem *a_, const struct list_elem *b_,
 
 	return a->priority > b->priority;
 }
+
+#ifdef USERPROG
+struct thread *find_child_thread(tid_t child_tid)
+{
+	struct thread *curr = thread_current();
+
+	for (struct list_elem *e = list_begin(&curr->children); e != list_end(&curr->children); e = list_next(e))
+	{
+		struct thread *child = list_entry(e, struct thread, child_elem);
+
+		if (child->tid == child_tid)
+		{
+			return child;
+		}
+	}
+
+	return NULL;
+}
+#endif

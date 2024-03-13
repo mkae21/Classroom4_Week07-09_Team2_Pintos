@@ -240,28 +240,73 @@ int process_exec(void *f_name)
  *
  * 이 함수는 문제 2-2에서 구현될 예정입니다.
  * 지금은 아무 일도 하지 않습니다. */
-int process_wait(tid_t child_tid UNUSED)
+// int process_wait(tid_t child_tid UNUSED)
+// {
+// 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
+// 	 * XXX:       to add infinite loop here before
+// 	 * XXX:       implementing the process_wait. */
+// 	/* 힌트) process_wait(initd)를 실행하면 핀토스가 종료되므로, process_wait을
+// 	 * 구현하기 전에 여기에 무한 루프를 추가하는 것이 좋습니다. */
+// 	return -1;
+// }
+int process_wait(tid_t child_tid)
 {
-	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
-	 * XXX:       to add infinite loop here before
-	 * XXX:       implementing the process_wait. */
-	/* 힌트) process_wait(initd)를 실행하면 핀토스가 종료되므로, process_wait을
-	 * 구현하기 전에 여기에 무한 루프를 추가하는 것이 좋습니다. */
-	return -1;
+	struct thread *child = find_child_thread(child_tid);
+
+	if (child == NULL)
+	{
+		return -1; // 자식 프로세스가 없거나 이미 wait한 경우
+	}
+
+	sema_down(&child->wait_sema); // 자식 프로세스가 종료될 때까지 대기
+
+	int exit_status = child->exit_status;
+	list_remove(&child->child_elem);
+	free(child);
+
+	return exit_status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
 /* 프로세스를 종료합니다. 이 함수는 thread_exit ()에 의해 호출됩니다. */
+// void process_exit(void)
+// {
+// 	struct thread *curr = thread_current();
+// 	/* TODO: Your code goes here.
+// 	 * TODO: Implement process termination message (see
+// 	 * TODO: project2/process_termination.html).
+// 	 * TODO: We recommend you to implement process resource cleanup here. */
+// 	/* 할 일: 코드는 여기로 이동합니다. 프로세스 종료 메시지를 구현합니다.
+// 	 * (project2/process_termination.html 참조)
+// 	 * 여기에서 프로세스 리소스 정리를 구현하는 것이 좋습니다. */
+// 	process_cleanup();
+// }
 void process_exit(void)
 {
 	struct thread *curr = thread_current();
-	/* TODO: Your code goes here.
-	 * TODO: Implement process termination message (see
-	 * TODO: project2/process_termination.html).
-	 * TODO: We recommend you to implement process resource cleanup here. */
-	/* 할 일: 코드는 여기로 이동합니다. 프로세스 종료 메시지를 구현합니다.
-	 * (project2/process_termination.html 참조)
-	 * 여기에서 프로세스 리소스 정리를 구현하는 것이 좋습니다. */
+
+	// 프로세스 종료 메시지 출력
+	printf("%s: exit(%d)\n", curr->name, curr->exit_status);
+
+	// 자식 프로세스들이 종료될 때까지 대기
+	while (!list_empty(&curr->child_elem))
+	{
+		struct thread *child = list_entry(list_pop_front(&curr->children), struct thread, child_elem);
+		sema_up(&child->wait_sema);
+		free(child);
+	}
+
+	// 파일 디스크립터 테이블 정리
+	for (int i = 0; i < FDT_COUNT_LIMIT; i++)
+	{
+		if (curr->fdt[i] != NULL)
+		{
+			file_close(curr->fdt[i]);
+			curr->fdt[i] = NULL;
+		}
+	}
+
+	// 프로세스 리소스 정리
 	process_cleanup();
 }
 
@@ -593,11 +638,11 @@ static bool load(const char *file_name, struct intr_frame *if_)
 	stack_top -= sizeof(int);
 	memcpy(stack_top, &argc, sizeof(int));
 
-	// 5. if_의 rsi와 rdi 레지스터에 각각 argv와 argc의 값을 저장합니다.
+	// 5. if_의 rsi와 rdi 레지스터에 각각 argv와 argc의 값을 저장
 	if_->R.rsi = (uint64_t)stack_top;
 	if_->R.rdi = (uint64_t)argc;
 
-	// hex_dump 함수를 사용하여 스택 내용 출력
+	// hex_dump 함수를 사용하여 스택 내용 출력 (for debugging)
 	hex_dump((uintptr_t)stack_top, (const char *)stack_top, (int)((const char *)USER_STACK - stack_top), true);
 
 	success = true;

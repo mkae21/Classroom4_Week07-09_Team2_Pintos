@@ -223,14 +223,14 @@ void bitmap_set_all(struct bitmap *b, bool value)
 /* B의 START에서 시작하는 CNT 비트를 VALUE로 설정합니다. */
 void bitmap_set_multiple(struct bitmap *b, size_t start, size_t cnt, bool value)
 {
-	size_t i;
-
 	ASSERT(b != NULL);
 	ASSERT(start <= b->bit_cnt);
 	ASSERT(start + cnt <= b->bit_cnt);
 
-	for (i = 0; i < cnt; i++)
+	for (size_t i = 0; i < cnt; i++)
+	{
 		bitmap_set(b, start + i, value);
+	}
 }
 
 /* Returns the number of bits in B between START and START + CNT,
@@ -334,8 +334,12 @@ size_t bitmap_scan(const struct bitmap *b, size_t start, size_t cnt, bool value)
 size_t bitmap_scan_and_flip(struct bitmap *b, size_t start, size_t cnt, bool value)
 {
 	size_t idx = bitmap_scan(b, start, cnt, value);
+
 	if (idx != BITMAP_ERROR)
+	{
 		bitmap_set_multiple(b, idx, cnt, !value);
+	}
+
 	return idx;
 }
 
