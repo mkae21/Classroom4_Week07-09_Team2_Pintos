@@ -21,17 +21,17 @@
         "-v",
         "-k",
         "-T",
-        "60000",
+        "60",
         "-m",
         "20",
         "--fs-disk=10",
         "-p",
-        "tests/userprog/args-dbl-space:args-dbl-space",
+        "tests/userprog/halt:halt",
         "--",
         "-q",
         "-f",
         "run",
-        "args-dbl-space two  spaces!"
+        "halt"
       ],
       "options": {
         "cwd": "${workspaceFolder}/${input:project}/build"

@@ -226,7 +226,6 @@ int process_exec(void *f_name)
 	}
 
 	bool success = load(f_name, &_if);
-
 	/*string 저장*/
 	char *addrs[LOADER_ARGS_LEN / 2 + 1];
 	for (int i = argc - 1; i >= 0; i--)
@@ -247,11 +246,12 @@ int process_exec(void *f_name)
 		total += strlen(argv[k]) + 1;
 	}
 
+
 	int padding = ROUND_UP(total, 8);
 	padding -= total;
 
 	_if.rsp -= padding;
-	memset(_if.rsp, 0, sizeof(_if.rsp));
+	memset(_if.rsp, 0, padding);
 
 	/*blank*/
 	_if.rsp -= sizeof(_if.rsp);
@@ -324,8 +324,9 @@ int process_wait(tid_t child_tid)
 	/* 힌트) process_wait(initd)를 실행하면 핀토스가 종료되므로, process_wait을
 	 * 구현하기 전에 여기에 무한 루프를 추가하는 것이 좋습니다. */
 
-	while (1)
+	for (int i = 0; i < 100000000;i++)
 	{
+		barrier();
 	}
 	return -1;
 }
@@ -352,22 +353,22 @@ void process_exit(void)
 	printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 
 	// 자식 프로세스들이 종료될 때까지 대기
-	while (!list_empty(&curr->child_elem))
-	{
-		struct thread *child = list_entry(list_pop_front(&curr->children), struct thread, child_elem);
-		sema_up(&child->wait_sema);
-		free(child);
-	}
+	// while (!list_empty(&curr->child_elem))
+	// {
+	// 	struct thread *child = list_entry(list_pop_front(&curr->children), struct thread, child_elem);
+	// 	sema_up(&child->wait_sema);
+	// 	free(child);
+	// }
 
 	// 파일 디스크립터 테이블 정리
-	for (int i = 0; i < FDT_COUNT_LIMIT; i++)
-	{
-		if (curr->fdt[i] != NULL)
-		{
-			file_close(curr->fdt[i]);
-			curr->fdt[i] = NULL;
-		}
-	}
+	// for (int i = 0; i < FDT_COUNT_LIMIT; i++)
+	// {
+	// 	if (curr->fdt[i] != NULL)
+	// 	{
+	// 		file_close(curr->fdt[i]);
+	// 		curr->fdt[i] = NULL;
+	// 	}
+	// }
 
 	// 프로세스 리소스 정리
 	process_cleanup();
@@ -669,12 +670,14 @@ static bool load(const char *file_name, struct intr_frame *if_)
 	// 파싱을 위해서 매뉴얼에서는 strtok_r() 함수를 사용할 것을 권장하고 있기에, 이를 사용
 	// 사소하지만 중요한 사항으로, 포인터 변수의 크기가 8 바이트씩이라는 것을 잊지 말기
 	// process_exec() 함수 내부
-
+	success = true;
 done:
 	/* We arrive here whether the load is successful or not. */
 	/* 로드 성공 여부와 상관없이 여기에 도착합니다. */
 
 	// 열었던 실행 파일을 닫음
+
+
 	file_close(file);
 	return success;
 }
