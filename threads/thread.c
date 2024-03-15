@@ -575,7 +575,7 @@ void thread_yield(void)
 // 		list_insert_ordered(&sleep_list, &curr->elem, compare_wakeup_tick, NULL);
 
 // 		// blocked 상태로 바꿔줌
-// 		thread_block();
+// thread_block();
 // 	}
 
 // 	// old_level 값에 맞춰서 enable or disable
@@ -1001,4 +1001,10 @@ bool compare_priority(const struct list_elem *a_, const struct list_elem *b_,
 	const struct thread *b = list_entry(b_, struct thread, elem);
 
 	return a->priority > b->priority;
+}
+
+void thread_try_yield(void)
+{
+	if (!list_empty(&ready_list) && thread_current() != idle_thread && !intr_context())
+		thread_yield();
 }

@@ -112,6 +112,8 @@ struct thread
 	int64_t tick;
 	int64_t wakeup_tick;
 
+	
+
 	/* Shared between thread.c and synch.c. */
 	/* thread.c와 synch.c가 공유합니다. */
 	struct list_elem elem;	   /* List element. */
@@ -220,4 +222,5 @@ int thread_get_load_avg(void);
 
 void do_iret(struct intr_frame *tf);
 bool larger(const struct list_elem *a, const struct list_elem *b, void *aux);
+void thread_try_yield(void);
 #endif /* threads/thread.h */

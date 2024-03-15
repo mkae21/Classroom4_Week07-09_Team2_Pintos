@@ -39,6 +39,7 @@ static void process_init(void)
  * before process_create_initd() returns. Returns the initd's
  * thread id, or TID_ERROR if the thread cannot be created.
  * Notice that THIS SHOULD BE CALLED ONCE. */
+
 /* 파일 이름에서 로드한 "initd"라는 첫 번째 유저랜드 프로그램을 시작합니다.
  * process_create_initd()가 반환되기 전에 새 스레드가 예약될 수 있으며
  * 종료될 수도 있습니다. initd의 스레드 ID를 반환하거나, 스레드를 생성할 수
@@ -58,6 +59,9 @@ tid_t process_create_initd(const char *file_name)
 	}
 
 	strlcpy(fn_copy, file_name, PGSIZE);
+
+	char *save_ptr;
+	strtok_r(file_name, " ", &save_ptr);
 
 	/* Create a new thread to execute FILE_NAME. */
 	/* FILE_NAME을 실행할 새 스레드를 생성합니다. */
@@ -185,14 +189,12 @@ error:
 /*실행 되어야 하는 명령줄 받을 때 함수명과 매개변수를 분리해 주는 것
 현재 실행 context에서 f_name 으로 switch하라*/
 
-int
-process_exec (void *f_name) {
-	char *file_name = f_name;
-	bool success;
-
+int process_exec(void *f_name)
+{
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
+
 	/* 스레드 구조에서는 intr_frame을 사용할 수 없습니다.
 	 * 현재 스레드가 스케줄을 변경할 때
 	 * 실행 정보를 멤버에 저장하기 때문입니다. */
@@ -206,13 +208,72 @@ process_exec (void *f_name) {
 	/* 먼저 현재 컨텍스트를 종료합니다. */
 	process_cleanup();
 
+	// hex_dump(,,,NULL);
 	/* And then load the binary */
 	/* 그런 다음 바이너리를 로드합니다. */
+
 	char *file_name = f_name;
+	int total = 0;
+	char *saveptr;
+	char *token;
+	int argc = 0;
+	/*+1하는 이유: 마지막 NULL요소 넣기 위해*/
+	char *argv[LOADER_ARGS_LEN / 2 + 1];
+
+	/* '\0' == NULL 문자*/
+	for (token = strtok_r(file_name, " ", &saveptr); token != NULL;
+		 token = strtok_r(NULL, " ", &saveptr))
+	{
+		argv[argc++] = token;
+	}
+                                                                                                            
 	bool success = load(file_name, &_if);
 
+
+	/*string 저장*/
+	char *addrs[64];
+	for (int i = argc - 1; i >= 0; i--)
+	{
+		_if.rsp -= strlen(argv[i]) + 1;
+		memcpy(_if.rsp, argv[i], strlen(argv[i])+1);
+		addrs[i] = _if.rsp;
+	}
+
+	/*rsi 설정*/
+	_if.R.rsi = _if.rsp;
+	
+	/*for padding*/
+	for(int k = argc -1 ; k >=0 ; k--){
+		total += strlen(argv[k])+1;
+	}
+	
+	int padding = ROUND_UP(total,8);
+	padding -= total;
+
+	_if.rsp -= padding;
+	memset(_if.rsp,0,sizeof(_if.rsp));
+	
+	/*blank*/
+	_if.rsp -= sizeof(_if.rsp);
+	memset(_if.rsp,0,sizeof(_if.rsp));
+
+	/*주소 값 저장*/
+	for(int j= argc-1 ; j >= 0 ; j--){
+		_if.rsp -= sizeof(_if.rsp);
+		// memcpy(_if.rsp, _if.R.rsi+(strlen(argv[j])+1), sizeof(_if.rsp));
+		memcpy(_if.rsp, addrs+j, sizeof(_if.rsp));
+
+		// printf("rsi:%p\n",_if.R.rsi);
+		// printf("**************%p\n", _if.R.rsi+(strlen(argv[j])+1));
+	}
+
+	/*0 반환 값 저장*/
+	_if.rsp -= sizeof(_if.rsp);
+	memset(_if.rsp, 0, sizeof(_if.rsp));
+
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
+
 	/* If load failed, quit. */
-	/* 로드에 실패하면 종료합니다. */
 	palloc_free_page(file_name);
 
 	if (!success)
@@ -251,6 +312,14 @@ int process_wait(tid_t child_tid UNUSED)
 	 * XXX:       implementing the process_wait. */
 	/* 힌트) process_wait(initd)를 실행하면 핀토스가 종료되므로, process_wait을
 	 * 구현하기 전에 여기에 무한 루프를 추가하는 것이 좋습니다. */
+
+	// for (int i = 0; i <= 10000000000; i++)
+	// {
+	// 	continue;
+	// }
+	while (1)
+	{
+	}
 	return -1;
 }
 
@@ -418,7 +487,7 @@ static bool load(const char *file_name, struct intr_frame *if_)
 	/* Allocate and activate page directory. */
 	/* 페이지 디렉토리를 할당하고 활성화합니다. */
 
-	// 각 프로세스가 실행이 될 때, 각 프로세스에 해당하는 VM(virtual memory)이 만들어져 함
+	// 각 프로세스가 실행이 될 때, 각 프로세스에 해당하는 VM(virtual memory)이 만들어져야 함
 	// 이를 위해 페이지 테이블 엔트리를 생성하는 과정이 우선적으로 필요
 	// 그 뒤, 파일을 실제로 VM에 올리는 과정 진행
 	t->pml4 = pml4_create();
@@ -428,10 +497,12 @@ static bool load(const char *file_name, struct intr_frame *if_)
 		goto done;
 	}
 
+	/*프로세스 실행*/
 	process_activate(thread_current());
-
 	/* Open executable file. */
 	/* 실행 파일을 엽니다. */
+
+	/*---------------------------------*/
 	struct file *file = filesys_open(file_name);
 
 	if (file == NULL)
@@ -443,6 +514,7 @@ static bool load(const char *file_name, struct intr_frame *if_)
 
 	/* Read and verify executable header. */
 	/* 실행 파일 헤더를 읽고 확인합니다. */
+	/*ELF = 파일의 형식, header + data 구조*/
 	struct ELF ehdr;
 
 	if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr || memcmp(ehdr.e_ident, "\177ELF\2\1\1", 7) || ehdr.e_type != 2 || ehdr.e_machine != 0x3E // amd64
@@ -536,6 +608,8 @@ static bool load(const char *file_name, struct intr_frame *if_)
 	/* Set up stack. */
 	/* 스택을 설정합니다. */
 	// 전부 메모리로 올린 뒤에 스택을 만드는 과정이 실행
+	/*rsp로 user_stack 저장*/
+
 	if (!setup_stack(if_))
 	{
 		goto done;
@@ -545,66 +619,6 @@ static bool load(const char *file_name, struct intr_frame *if_)
 	/* 시작 주소. */
 	// 어떤 명령부터 실행되는지를 가리키는, 즉 entry point 역할의 rip를 설정
 	if_->rip = ehdr.e_entry;
-
-	/* TODO: Your code goes here.
-	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-	/* 할 일: 코드가 여기로 이동합니다.
-	 * 할 일: 인수 전달을 구현합니다. (project2/argument_passing.html 참조) */
-
-	// 들어온 입력을 파싱해 USER_STACK에 채워넣는 루틴 추가
-	// 만약 입력으로 들어오는 명령이 argument를 포함하고 있다면 load()의 코드에서 filename이 이제 진정한 파일의 이름이 아닐 수 있음
-	// 순수한 실행 파일의 이름을 얻어내기 위해서, 파싱 자체는 load() 함수의 시작 즈음에 이루어져야 함
-
-	// 파싱을 위해서 매뉴얼에서는 strtok_r() 함수를 사용할 것을 권장하고 있기에, 이를 사용
-	// 사소하지만 중요한 사항으로, 포인터 변수의 크기가 8 바이트씩이라는 것을 잊지 말기
-	// process_exec() 함수 내부
-
-	// 1. file_name을 파싱하여 프로그램 이름과 인자들을 스택에 저장
-	// -> strtok_r() 함수를 사용하여 프로그램 이름과 인자들을 추출
-	char *save_ptr;
-	int argc = 0;
-	char *argv[LOADER_ARGS_LEN / 2 + 1];
-
-	for (char *token = strtok_r(file_name, " ", &save_ptr); token != NULL;
-		 token = strtok_r(NULL, " ", &save_ptr))
-	{
-		argv[argc++] = token;
-	}
-
-	// 2. 인자 문자열들은 스택의 최상단에 위치하도록 저장
-	// -> 추출한 프로그램 이름과 인자들을 스택에 저장하기 위함
-	void *stack_bottom = (void *)(((uint8_t *)USER_STACK) - PGSIZE);
-	char *stack_top = (char *)stack_bottom + PGSIZE;
-
-	for (int i = argc - 1; i >= 0; i--)
-	{
-		size_t len = strlen(argv[i]) + 1;
-		stack_top -= len;
-		memcpy(stack_top, argv[i], len);
-		argv[i] = stack_top;
-	}
-
-	// 3. 그 다음에 인자 문자열들의 주소를 담은 포인터 배열을 스택에 저장
-	// 이 배열의 끝은 NULL 포인터로 표시
-	size_t ptrs_size = (argc + 1) * sizeof(char *);
-	stack_top -= ptrs_size;
-	memcpy(stack_top, argv, ptrs_size);
-
-	// 4. 마지막으로 인자의 개수(argc)와 포인터 배열의 주소(argv)를 스택에 push
-	stack_top -= sizeof(char *);
-	memset(stack_top, 0, sizeof(char *));
-
-	stack_top -= sizeof(int);
-	memcpy(stack_top, &argc, sizeof(int));
-
-	// 5. if_의 rsi와 rdi 레지스터에 각각 argv와 argc의 값을 저장합니다.
-	if_->R.rsi = (uint64_t)stack_top;
-	if_->R.rdi = (uint64_t)argc;
-
-	// hex_dump 함수를 사용하여 스택 내용 출력
-	hex_dump((uintptr_t)stack_top, (const char *)stack_top, (int)((const char *)USER_STACK - stack_top), true);
-
-	success = true;
 
 done:
 	/* We arrive here whether the load is successful or not. */
