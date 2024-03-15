@@ -120,20 +120,6 @@ static tid_t allocate_tid(void);
 // gdt는 thread_init 이후에 설정되므로 임시 gdt를 먼저 설정해야 합니다.
 static uint64_t gdt[3] = {0, 0x00af9a000000ffff, 0x00cf92000000ffff};
 
-/* Initializes the threading system by transforming the code
-   that's currently running into a thread.  This can't work in
-   general and it is possible in this case only because loader.S
-   was careful to put the bottom of the stack at a page boundary.
-
-   Also initializes the run queue and the tid lock.
-
-   After calling this function, be sure to initialize the page
-   allocator before trying to create any threads with
-   thread_create().
-
-   It is not safe to call thread_current() until this function
-   finishes. */
-
 bool local_tick(const struct list_elem *a, const struct list_elem *b, void *aux)
 {
 	struct thread *A = list_entry(a, struct thread, elem);
@@ -161,6 +147,20 @@ bool larger(const struct list_elem *a, const struct list_elem *b, void *aux)
 		return false;
 	}
 }
+
+/* Initializes the threading system by transforming the code
+   that's currently running into a thread.  This can't work in
+   general and it is possible in this case only because loader.S
+   was careful to put the bottom of the stack at a page boundary.
+
+   Also initializes the run queue and the tid lock.
+
+   After calling this function, be sure to initialize the page
+   allocator before trying to create any threads with
+   thread_create().
+
+   It is not safe to call thread_current() until this function
+   finishes. */
 /* 현재 실행 중인 코드를 스레드로 변환하여 스레딩 시스템을 초기화합니다.
    일반적으로는 작동하지 않으며 이 경우에만 가능한 이유는 loader.S가
    스택의 맨 아래를 페이지 경계에 배치하도록 주의했기 때문입니다.
@@ -314,7 +314,6 @@ tid_t thread_create(const char *name, int priority,
 					thread_func *function, void *aux)
 {
 	ASSERT(function != NULL);
-
 	struct thread *t = palloc_get_page(PAL_ZERO); /* allocating one page */
 												  /* 페이지 할당 */
 
@@ -437,7 +436,6 @@ struct thread *thread_current(void)
 	   스택은 4KB 미만이므로 몇 개의 큰 자동 배열이나 중간 정도의 재귀가
 	   스택 오버플로를 일으킬 수 있습니다. */
 	ASSERT(is_thread(t));
-	debug_msg("t->status: %d", t->status);
 	ASSERT(t->status == THREAD_RUNNING);
 
 	return t;
