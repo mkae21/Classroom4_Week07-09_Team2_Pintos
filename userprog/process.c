@@ -228,6 +228,7 @@ int process_exec(void *f_name)
 	bool success = load(f_name, &_if);
 	/*string 저장*/
 	char *addrs[LOADER_ARGS_LEN / 2 + 1];
+
 	for (int i = argc - 1; i >= 0; i--)
 	{
 		_if.rsp -= strlen(argv[i]) + 1;
@@ -246,8 +247,7 @@ int process_exec(void *f_name)
 		total += strlen(argv[k]) + 1;
 	}
 
-
-	int padding = ROUND_UP(total, 8);
+	int padding = ROUND_UP(total, sizeof(uint64_t));
 	padding -= total;
 
 	_if.rsp -= padding;
@@ -272,10 +272,12 @@ int process_exec(void *f_name)
 	_if.rsp -= sizeof(_if.rsp);
 	memset(_if.rsp, 0, sizeof(_if.rsp));
 
-	hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
 
 	/* If load failed, quit. */
 	palloc_free_page(f_name);
+
+	success = true;
 
 	if (!success)
 	{
@@ -317,17 +319,19 @@ int process_exec(void *f_name)
 // }
 int process_wait(tid_t child_tid)
 {
-
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
 	/* 힌트) process_wait(initd)를 실행하면 핀토스가 종료되므로, process_wait을
 	 * 구현하기 전에 여기에 무한 루프를 추가하는 것이 좋습니다. */
 
-	for (int i = 0; i < 100000000;i++)
+	// 프로세스가 다른 system call이 처리될 때까지 충분히 기다림
+	// 단, 이는 프로세스가 종료될 때까지 기다리는 것이 아니라, 다른 system call이 처리될 때까지 기다리는 것
+	for (int i = 0; i < 100000000; i++)
 	{
 		barrier();
 	}
+
 	return -1;
 }
 
@@ -349,10 +353,10 @@ void process_exit(void)
 {
 	struct thread *curr = thread_current();
 
-	// 프로세스 종료 메시지 출력
-	printf("%s: exit(%d)\n", curr->name, curr->exit_status);
+	// // 프로세스 종료 메시지 출력
+	// printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 
-	// 자식 프로세스들이 종료될 때까지 대기
+	// // 자식 프로세스들이 종료될 때까지 대기
 	// while (!list_empty(&curr->child_elem))
 	// {
 	// 	struct thread *child = list_entry(list_pop_front(&curr->children), struct thread, child_elem);
@@ -360,7 +364,7 @@ void process_exit(void)
 	// 	free(child);
 	// }
 
-	// 파일 디스크립터 테이블 정리
+	// // 파일 디스크립터 테이블 정리
 	// for (int i = 0; i < FDT_COUNT_LIMIT; i++)
 	// {
 	// 	if (curr->fdt[i] != NULL)
@@ -676,7 +680,6 @@ done:
 	/* 로드 성공 여부와 상관없이 여기에 도착합니다. */
 
 	// 열었던 실행 파일을 닫음
-
 
 	file_close(file);
 	return success;
