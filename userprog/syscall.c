@@ -51,19 +51,6 @@ static void close(int fd);
 #define MSR_SYSCALL_MASK 0xc0000084 /* Mask for the eflags */
 									/* 이플래그를 위한 마스크 */
 
-void debug_msg(const char *format, ...)
-{
-#ifdef DEBUG_THREADS
-	va_list args;
-
-	printf("[DEBUG] thread_name: %s, ", thread_current()->name);
-	va_start(args, format);
-	vprintf(format, args);
-	va_end(args);
-	putchar('\n');
-#endif
-}
-
 void syscall_init(void)
 {
 	write_msr(MSR_STAR, ((uint64_t)SEL_UCSEG - 0x10) << 48 |

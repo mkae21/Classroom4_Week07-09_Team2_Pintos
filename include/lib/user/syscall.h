@@ -5,19 +5,6 @@
 #include <debug.h>
 #include <stddef.h>
 
-#define DEBUG_THREADS
-// #define USERPROG
-
-#ifdef DEBUG_THREADS
-/* Prints FORMAT as if with printf(),
-   prefixing the output by the name of the test
-   and following it with a new-line character. */
-/* 출력 앞에 테스트 이름을 접두사로 붙이고
-   그 뒤에 새 줄 문자를 붙여 마치 printf()를
-   사용하는 것처럼 FORMAT을 인쇄합니다.*/
-void debug_msg(const char *format, ...);
-#endif
-
 /* Process identifier. */
 typedef int pid_t;
 #define PID_ERROR ((pid_t)-1)
