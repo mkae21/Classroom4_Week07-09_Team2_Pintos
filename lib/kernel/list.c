@@ -234,7 +234,6 @@ void list_insert(struct list_elem *before, struct list_elem *elem)
 	before->prev = elem;
 }
 
-
 /* Removes elements FIRST though LAST (exclusive) from their
    current list, then inserts them just before BEFORE, which may
    be either an interior element or a tail. */
@@ -573,17 +572,17 @@ void list_insert_ordered(struct list *list, struct list_elem *elem,
 {
 	struct list_elem *e;
 
-	ASSERT (list != NULL);
-	ASSERT (elem != NULL);
-	ASSERT (less != NULL);
+	ASSERT(list != NULL);
+	ASSERT(elem != NULL);
+	ASSERT(less != NULL);
 	/*list의 시작부터 끝까지 하나씩 비교후 자리 찾기 */
-	for (e = list_begin (list); e != list_end (list); e = list_next (e))
-		/*priority elem과 e 비교하고 e가 더 크면 
+	for (e = list_begin(list); e != list_end(list); e = list_next(e))
+		/*priority elem과 e 비교하고 e가 더 크면
 		break 'e' 앞자리가 'elem'자리*/
-		if (less (elem, e, aux))
+		if (less(elem, e, aux))
 			break;
 	/*왼쪽 요소 전 자리에 오른쪽 요소 위치 시켜라*/
-	return list_insert (e, elem);
+	return list_insert(e, elem);
 }
 
 /* Iterates through LIST and removes all but the first in each
@@ -659,4 +658,3 @@ struct list_elem *list_min(struct list *list, list_less_func *less, void *aux)
 
 	return min;
 }
-
