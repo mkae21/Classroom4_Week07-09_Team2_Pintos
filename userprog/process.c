@@ -251,7 +251,7 @@ int process_exec(void *f_name)
 	padding -= total;
 
 	_if.rsp -= padding;
-	memset(_if.rsp, 0, sizeof(_if.rsp));
+	memset(_if.rsp, 0, padding);
 
 	/*blank*/
 	_if.rsp -= sizeof(_if.rsp);
