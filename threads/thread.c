@@ -563,7 +563,7 @@ void thread_yield(void)
 // 		list_insert_ordered(&sleep_list, &curr->elem, compare_wakeup_tick, NULL);
 
 // 		// blocked 상태로 바꿔줌
-// 		thread_block();
+// thread_block();
 // 	}
 
 // 	// old_level 값에 맞춰서 enable or disable
@@ -998,21 +998,9 @@ bool compare_priority(const struct list_elem *a_, const struct list_elem *b_,
 	return a->priority > b->priority;
 }
 
-#ifdef USERPROG
-struct thread *find_child_thread(tid_t child_tid)
+
+void thread_try_yield(void)
 {
-	struct thread *curr = thread_current();
-
-	for (struct list_elem *e = list_begin(&curr->children); e != list_end(&curr->children); e = list_next(e))
-	{
-		struct thread *child = list_entry(e, struct thread, child_elem);
-
-		if (child->tid == child_tid)
-		{
-			return child;
-		}
-	}
-
-	return NULL;
+	if (!list_empty(&ready_list) && thread_current() != idle_thread && !intr_context())
+		thread_yield();
 }
-#endif
