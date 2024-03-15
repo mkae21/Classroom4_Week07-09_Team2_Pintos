@@ -305,36 +305,71 @@ int process_exec(void *f_name)
  *
  * 이 함수는 문제 2-2에서 구현될 예정입니다.
  * 지금은 아무 일도 하지 않습니다. */
-int process_wait(tid_t child_tid UNUSED)
+// int process_wait(tid_t child_tid UNUSED)
+// {
+// 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
+// 	 * XXX:       to add infinite loop here before
+// 	 * XXX:       implementing the process_wait. */
+// 	/* 힌트) process_wait(initd)를 실행하면 핀토스가 종료되므로, process_wait을
+// 	 * 구현하기 전에 여기에 무한 루프를 추가하는 것이 좋습니다. */
+// 	return -1;
+// }
+int process_wait(tid_t child_tid)
 {
+
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
 	/* 힌트) process_wait(initd)를 실행하면 핀토스가 종료되므로, process_wait을
 	 * 구현하기 전에 여기에 무한 루프를 추가하는 것이 좋습니다. */
 
-	// for (int i = 0; i <= 10000000000; i++)
-	// {
-	// 	continue;
-	// }
 	while (1)
 	{
 	}
 	return -1;
+
 }
 
 /* Exit the process. This function is called by thread_exit (). */
 /* 프로세스를 종료합니다. 이 함수는 thread_exit ()에 의해 호출됩니다. */
+// void process_exit(void)
+// {
+// 	struct thread *curr = thread_current();
+// 	/* TODO: Your code goes here.
+// 	 * TODO: Implement process termination message (see
+// 	 * TODO: project2/process_termination.html).
+// 	 * TODO: We recommend you to implement process resource cleanup here. */
+// 	/* 할 일: 코드는 여기로 이동합니다. 프로세스 종료 메시지를 구현합니다.
+// 	 * (project2/process_termination.html 참조)
+// 	 * 여기에서 프로세스 리소스 정리를 구현하는 것이 좋습니다. */
+// 	process_cleanup();
+// }
 void process_exit(void)
 {
 	struct thread *curr = thread_current();
-	/* TODO: Your code goes here.
-	 * TODO: Implement process termination message (see
-	 * TODO: project2/process_termination.html).
-	 * TODO: We recommend you to implement process resource cleanup here. */
-	/* 할 일: 코드는 여기로 이동합니다. 프로세스 종료 메시지를 구현합니다.
-	 * (project2/process_termination.html 참조)
-	 * 여기에서 프로세스 리소스 정리를 구현하는 것이 좋습니다. */
+
+	// 프로세스 종료 메시지 출력
+	printf("%s: exit(%d)\n", curr->name, curr->exit_status);
+
+	// 자식 프로세스들이 종료될 때까지 대기
+	while (!list_empty(&curr->child_elem))
+	{
+		struct thread *child = list_entry(list_pop_front(&curr->children), struct thread, child_elem);
+		sema_up(&child->wait_sema);
+		free(child);
+	}
+
+	// 파일 디스크립터 테이블 정리
+	for (int i = 0; i < FDT_COUNT_LIMIT; i++)
+	{
+		if (curr->fdt[i] != NULL)
+		{
+			file_close(curr->fdt[i]);
+			curr->fdt[i] = NULL;
+		}
+	}
+
+	// 프로세스 리소스 정리
 	process_cleanup();
 }
 
@@ -620,6 +655,20 @@ static bool load(const char *file_name, struct intr_frame *if_)
 	// 어떤 명령부터 실행되는지를 가리키는, 즉 entry point 역할의 rip를 설정
 	if_->rip = ehdr.e_entry;
 
+	/* TODO: Your code goes here.
+	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+	/* 할 일: 코드가 여기로 이동합니다.
+	 * 할 일: 인수 전달을 구현합니다. (project2/argument_passing.html 참조) */
+
+	// 들어온 입력을 파싱해 USER_STACK에 채워넣는 루틴 추가
+	// 만약 입력으로 들어오는 명령이 argument를 포함하고 있다면 load()의 코드에서 filename이 이제 진정한 파일의 이름이 아닐 수 있음
+	// 순수한 실행 파일의 이름을 얻어내기 위해서, 파싱 자체는 load() 함수의 시작 즈음에 이루어져야 함
+
+	// 파싱을 위해서 매뉴얼에서는 strtok_r() 함수를 사용할 것을 권장하고 있기에, 이를 사용
+	// 사소하지만 중요한 사항으로, 포인터 변수의 크기가 8 바이트씩이라는 것을 잊지 말기
+	// process_exec() 함수 내부
+
+	
 done:
 	/* We arrive here whether the load is successful or not. */
 	/* 로드 성공 여부와 상관없이 여기에 도착합니다. */

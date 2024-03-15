@@ -141,22 +141,23 @@ bool sema_try_down(struct semaphore *sema)
    이 함수는 인터럽트 핸들러에서 호출할 수 있습니다. */
 void sema_up(struct semaphore *sema)
 {
-   enum intr_level old_level;
-   struct thread *t;
-
    ASSERT(sema != NULL);
 
-   old_level = intr_disable();
+   enum intr_level old_level = intr_disable();
+
    if (!list_empty(&sema->waiters))
    {
       list_sort(&sema->waiters, (list_less_func *)&larger, NULL);
-      t = list_entry(list_pop_front(&sema->waiters), struct thread, elem);
+      struct thread *t = list_entry(list_pop_front(&sema->waiters), struct thread, elem);
       thread_unblock(t);
    }
-   sema->value++;
+
+   ++(sema->value);
    intr_set_level(old_level);
-   // thread_yield();
+
+   //ready_list가 비어 있어야 가능합니다
    thread_try_yield();
+
 }
 
 static void sema_test_helper(void *sema_);

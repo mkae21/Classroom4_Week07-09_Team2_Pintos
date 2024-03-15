@@ -303,22 +303,22 @@ void *palloc_get_multiple(enum palloc_flags flags, size_t page_cnt)
 	lock_acquire(&pool->lock);
 	size_t page_idx = bitmap_scan_and_flip(pool->used_map, 0, page_cnt, false);
 	lock_release(&pool->lock);
-	void *pages;
 
-	if (page_idx != BITMAP_ERROR)
-		pages = pool->base + PGSIZE * page_idx;
-	else
-		pages = NULL;
+	void *pages = page_idx != BITMAP_ERROR ? pool->base + PGSIZE * page_idx : NULL;
 
 	if (pages)
 	{
 		if (flags & PAL_ZERO)
+		{
 			memset(pages, 0, PGSIZE * page_cnt);
+		}
 	}
 	else
 	{
 		if (flags & PAL_ASSERT)
+		{
 			PANIC("palloc_get: out of pages");
+		}
 	}
 
 	return pages;
