@@ -346,7 +346,6 @@ void *palloc_get_page(enum palloc_flags flags)
 void palloc_free_multiple(void *pages, size_t page_cnt)
 {
 	struct pool *pool;
-	size_t page_idx;
 
 	ASSERT(pg_ofs(pages) == 0);
 	if (pages == NULL || page_cnt == 0)
@@ -359,7 +358,7 @@ void palloc_free_multiple(void *pages, size_t page_cnt)
 	else
 		NOT_REACHED();
 
-	page_idx = pg_no(pages) - pg_no(pool->base);
+	size_t page_idx = pg_no(pages) - pg_no(pool->base);
 
 #ifndef NDEBUG
 	memset(pages, 0xcc, PGSIZE * page_cnt);

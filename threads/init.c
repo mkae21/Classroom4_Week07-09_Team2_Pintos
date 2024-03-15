@@ -67,7 +67,7 @@ int main(void) NO_RETURN;
 /* Pintos main program. */
 int main(void)
 {
-	uint64_t mem_end; // for what? ->
+	uint64_t mem_end;
 	char **argv;
 
 	/* Clear BSS and get machine's RAM size. */
@@ -76,7 +76,6 @@ int main(void)
 	/* Break command line into arguments and parse options. */
 	argv = read_command_line(); // 읽기
 	argv = parse_options(argv); // 비-옵션 인자 반환해서 저장
-
 	/* Initialize ourselves as a thread so we can use locks,
 	   then enable console locking. */
 
@@ -155,6 +154,7 @@ static void bss_init(void)
 /* Populates the page table with the kernel virtual mapping,
  * and then sets up the CPU to use the new page directory.
  * Points base_pml4 to the pml4 it creates. */
+
 /* 커널 가상 매핑으로 페이지 테이블을 채운 다음 CPU가
  * 새 페이지 디렉터리를 사용하도록 설정합니다.
  * base_pml4를 생성한 pml4로 가리킵니다. */
@@ -163,7 +163,8 @@ static void paging_init(uint64_t mem_end)
 	uint64_t *pml4 = base_pml4 = palloc_get_page(PAL_ASSERT | PAL_ZERO);
 	extern char start, _end_kernel_text;
 	// Maps physical address [0 ~ mem_end] to
-	//   [LOADER_KERN_BASE ~ LOADER_KERN_BASE + mem_end].
+	// [LOADER_KERN_BASE ~ LOADER_KERN_BASE + mem_end].
+
 	// 실제 주소 [0 ~ mem_end]를 다음과 같이 매핑합니다.
 	// [LOADER_KERN_BASE ~ LOADER_KERN_BASE + mem_end].
 	for (uint64_t pa = 0; pa < mem_end; pa += PGSIZE)

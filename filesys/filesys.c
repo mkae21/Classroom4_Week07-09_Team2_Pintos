@@ -79,6 +79,7 @@ bool filesys_create(const char *name, off_t initial_size)
  * 존재하지 않거나 내부 메모리 할당이 실패하면 실패합니다. */
 struct file *filesys_open(const char *name)
 {
+	/*root directory open*/
 	struct dir *dir = dir_open_root();
 	struct inode *inode = NULL;
 
