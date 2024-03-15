@@ -752,12 +752,6 @@ static void init_thread(struct thread *t, const char *name, int priority)
 	// for checking stackover flow
 	t->magic = THREAD_MAGIC;
 	list_init(&t->donations);
-
-#ifdef USERPROG
-	t->pml4 = pml4_create();
-	sema_init(&t->wait_sema, 0);
-	t->exit_status = 0;
-#endif
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -995,7 +989,6 @@ bool compare_priority(const struct list_elem *a_, const struct list_elem *b_,
 
 	return a->priority > b->priority;
 }
-
 
 void thread_try_yield(void)
 {

@@ -26,12 +26,12 @@
         "20",
         "--fs-disk=10",
         "-p",
-        "tests/userprog/args-none:args-none",
+        "tests/userprog/args-dbl-space:args-dbl-space",
         "--",
         "-q",
         "-f",
         "run",
-        "args-none"
+        "args-dbl-space two  spaces!"
       ],
       "options": {
         "cwd": "${workspaceFolder}/${input:project}/build"

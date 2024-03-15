@@ -212,56 +212,57 @@ int process_exec(void *f_name)
 	/* And then load the binary */
 	/* 그런 다음 바이너리를 로드합니다. */
 
-	char *file_name = f_name;
-	int total = 0;
-	char *saveptr;
-	char *token;
-	int argc = 0;
-	/*+1하는 이유: 마지막 NULL요소 넣기 위해*/
+	/* +1 하는 이유: 마지막 NULL요소 넣기 위해*/
 	char *argv[LOADER_ARGS_LEN / 2 + 1];
 
 	/* '\0' == NULL 문자*/
-	for (token = strtok_r(file_name, " ", &saveptr); token != NULL;
-		 token = strtok_r(NULL, " ", &saveptr))
+	char *save_ptr;
+	int argc = 0;
+
+	for (char *token = strtok_r(f_name, " ", &save_ptr); token != NULL;
+		 token = strtok_r(NULL, " ", &save_ptr))
 	{
 		argv[argc++] = token;
 	}
-                                                                                                            
-	bool success = load(file_name, &_if);
 
+	bool success = load(f_name, &_if);
 
 	/*string 저장*/
-	char *addrs[64];
+	char *addrs[LOADER_ARGS_LEN / 2 + 1];
 	for (int i = argc - 1; i >= 0; i--)
 	{
 		_if.rsp -= strlen(argv[i]) + 1;
-		memcpy(_if.rsp, argv[i], strlen(argv[i])+1);
+		memcpy(_if.rsp, argv[i], strlen(argv[i]) + 1);
 		addrs[i] = _if.rsp;
 	}
 
 	/*rsi 설정*/
 	_if.R.rsi = _if.rsp;
-	
+
 	/*for padding*/
-	for(int k = argc -1 ; k >=0 ; k--){
-		total += strlen(argv[k])+1;
+	int total = 0;
+
+	for (int k = argc - 1; k >= 0; k--)
+	{
+		total += strlen(argv[k]) + 1;
 	}
-	
-	int padding = ROUND_UP(total,8);
+
+	int padding = ROUND_UP(total, 8);
 	padding -= total;
 
 	_if.rsp -= padding;
-	memset(_if.rsp,0,sizeof(_if.rsp));
-	
+	memset(_if.rsp, 0, sizeof(_if.rsp));
+
 	/*blank*/
 	_if.rsp -= sizeof(_if.rsp);
-	memset(_if.rsp,0,sizeof(_if.rsp));
+	memset(_if.rsp, 0, sizeof(_if.rsp));
 
 	/*주소 값 저장*/
-	for(int j= argc-1 ; j >= 0 ; j--){
+	for (int j = argc - 1; j >= 0; j--)
+	{
 		_if.rsp -= sizeof(_if.rsp);
 		// memcpy(_if.rsp, _if.R.rsi+(strlen(argv[j])+1), sizeof(_if.rsp));
-		memcpy(_if.rsp, addrs+j, sizeof(_if.rsp));
+		memcpy(_if.rsp, addrs + j, sizeof(_if.rsp));
 
 		// printf("rsi:%p\n",_if.R.rsi);
 		// printf("**************%p\n", _if.R.rsi+(strlen(argv[j])+1));
@@ -274,7 +275,7 @@ int process_exec(void *f_name)
 	hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
 
 	/* If load failed, quit. */
-	palloc_free_page(file_name);
+	palloc_free_page(f_name);
 
 	if (!success)
 	{
@@ -327,7 +328,6 @@ int process_wait(tid_t child_tid)
 	{
 	}
 	return -1;
-
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -626,6 +626,8 @@ static bool load(const char *file_name, struct intr_frame *if_)
 					zero_bytes = ROUND_UP(page_offset + phdr.p_memsz, PGSIZE);
 				}
 
+				// 파싱 코드를 load 함수 안에 넣으면 이 곳에서 Issue 발생
+				// 원인 파악은 못 함
 				if (!load_segment(file, file_page, (void *)mem_page,
 								  read_bytes, zero_bytes, writable))
 				{
@@ -668,7 +670,6 @@ static bool load(const char *file_name, struct intr_frame *if_)
 	// 사소하지만 중요한 사항으로, 포인터 변수의 크기가 8 바이트씩이라는 것을 잊지 말기
 	// process_exec() 함수 내부
 
-	
 done:
 	/* We arrive here whether the load is successful or not. */
 	/* 로드 성공 여부와 상관없이 여기에 도착합니다. */
