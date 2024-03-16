@@ -1,7 +1,44 @@
 {
-  // IntelliSense를 사용하여 가능한 특성에 대해 알아보세요.
-  // 기존 특성에 대한 설명을 보려면 가리킵니다.
-  // 자세한 내용을 보려면 https://go.microsoft.com/fwlink/?linkid=830387을(를) 방문하세요.
   "version": "0.2.0",
-  "configurations": []
+  "configurations": [
+    {
+      "name": "(gdb) Debug Kernel with User Program",
+      "type": "cppdbg",
+      "request": "launch",
+      "program": "${workspaceRoot}/${input:project}/build/kernel.o",
+      "MIMode": "gdb",
+      "stopAtEntry": true,
+      "cwd": "${workspaceFolder}",
+      "targetArchitecture": "x86_64",
+      "externalConsole": true,
+      "miDebuggerServerAddress": "localhost:1234",
+      "setupCommands": [
+        {
+          "text": "-enable-pretty-printing",
+          "description": "Enable pretty-printing for gdb",
+          "ignoreFailures": true
+        },
+        {
+          "text": "-gdb-set disassembly-flavor intel",
+          "description": "Set Disassembly Flavor to Intel",
+          "ignoreFailures": true
+        }
+      ],
+      "preLaunchTask": "Debug PintOS User Program"
+    }
+  ],
+  "inputs": [
+    {
+      "id": "project",
+      "description": "[launch] Enter the project to start.",
+      "type": "pickString",
+      "options": [
+        "threads",
+        "userprog",
+        "vm",
+        "filesys"
+      ],
+      "default": "userprog"
+    }
+  ]
 }
