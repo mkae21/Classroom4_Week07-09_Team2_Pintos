@@ -390,17 +390,24 @@ pyrightconfig.json
 
 ### VisualStudioCode ###
 .vscode/*
-!.vscode/tasks.json
 !.vscode/extensions.json
 !.vscode/*.code-snippets
+
+# 공유 launch.json은 launch_default.json으로 공유할 것
+#!.vscode/c_cpp_properties.json
+!.vscode/c_cpp_properties_default.json
+
+# 공유 launch.json은 launch_default.json으로 공유할 것
+#!.vscode/launch.json
+!.vscode/launch_default.json
 
 # 공유 settings는 settings_default.json으로 공유할 것
 #!.vscode/settings.json
 !.vscode/settings_default.json
 
-# 공유 launch.json은 launch_default.json으로 공유할 것
-#!.vscode/launch.json
-!.vscode/launch_default.json
+# 공유 launch.json은 tasks_default.json으로 공유할 것
+#!.vscode/tasks.json
+!.vscode/tasks_default.json
 
 # Local History for Visual Studio Code
 .history/
@@ -839,4 +846,4 @@ FodyWeavers.xsd
 ### VisualStudio Patch ###
 # Additional files built by Visual Studio
 
-# End of https://www.toptal.com/developers/gitignore/api/linux,windows,macos,visualstudio,visualstudiocode,c,xcode,python,clion
+# End of https://www.toptal.com/developers/gitignore/api/linux,windows,macos,visualstudio,visualstudiocode,c,xcode,python,clion.vscode

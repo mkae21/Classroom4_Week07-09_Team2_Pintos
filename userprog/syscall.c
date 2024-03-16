@@ -92,7 +92,7 @@ void syscall_init(void)
 /*interrupt 받아옴*/
 void syscall_handler(struct intr_frame *f)
 {
-	printf("system call!\n");
+	printf("[syscall] syscall_handler - system call!\n");
 
 	thread_current()->tf = *f;
 
