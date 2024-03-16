@@ -225,6 +225,9 @@ int process_exec(void *f_name)
 		argv[argc++] = token;
 	}
 
+	// Gitbook에 적힌 내용 구현
+	_if.R.rdi = argc;
+
 	bool success = load(f_name, &_if);
 	/*string 저장*/
 	char *addrs[LOADER_ARGS_LEN / 2 + 1];
@@ -235,9 +238,6 @@ int process_exec(void *f_name)
 		memcpy(_if.rsp, argv[i], strlen(argv[i]) + 1);
 		addrs[i] = _if.rsp;
 	}
-
-	/*rsi 설정*/
-	_if.R.rsi = _if.rsp;
 
 	/*for padding*/
 	int total = 0;
@@ -268,16 +268,17 @@ int process_exec(void *f_name)
 		// printf("**************%p\n", _if.R.rsi+(strlen(argv[j])+1));
 	}
 
+	// Gitbook에 적힌 내용 구현
+	_if.R.rsi = _if.rsp;
+
 	/*0 반환 값 저장*/
-	_if.rsp -= sizeof(_if.rsp);
-	memset(_if.rsp, 0, sizeof(_if.rsp));
+	_if.rsp -= sizeof(void *);
+	memset(_if.rsp, 0, sizeof(void *));
 
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - (uint64_t)_if.rsp, true);
 
 	/* If load failed, quit. */
 	palloc_free_page(f_name);
-
-	success = true;
 
 	if (!success)
 	{
@@ -327,10 +328,15 @@ int process_wait(tid_t child_tid)
 
 	// 프로세스가 다른 system call이 처리될 때까지 충분히 기다림
 	// 단, 이는 프로세스가 종료될 때까지 기다리는 것이 아니라, 다른 system call이 처리될 때까지 기다리는 것
-	for (int i = 0; i < 100000000; i++)
+	while (true)
 	{
 		barrier();
 	}
+
+	// for (int i = 0; i < 1000000000; i++)
+	// {
+	// 	// barrier();
+	// }
 
 	return -1;
 }
