@@ -8,7 +8,7 @@
 struct file
 {
 	struct inode *inode; /* File's inode. */
-						 /* 파일의 이노드. */
+						 /* 파일의 INODE. */
 	off_t pos;			 /* Current position. */
 						 /* 현재 위치. */
 	bool deny_write;	 /* Has file_deny_write() been called? */
@@ -19,7 +19,7 @@ struct file
  * and returns the new file.  Returns a null pointer if an
  * allocation fails or if INODE is null. */
 /* 지정된 INODE에 대한 파일을 열고 소유권을 가져온 후 새 파일을 반환합니다.
- * 할당이 실패하거나 INODE가 널이면 널 포인터를 반환합니다. */
+ * 할당이 실패하거나 INODE가 null이면 null 포인터를 반환합니다. */
 struct file *file_open(struct inode *inode)
 {
 	struct file *file = calloc(1, sizeof *file);
@@ -40,6 +40,8 @@ struct file *file_open(struct inode *inode)
 
 /* Opens and returns a new file for the same inode as FILE.
  * Returns a null pointer if unsuccessful. */
+/* FILE과 동일한 INODE에 대한 새 파일을 열고 반환합니다.
+ * 실패하면 null 포인터를 반환합니다. */
 struct file *file_reopen(struct file *file)
 {
 	return file_open(inode_reopen(file->inode));
@@ -47,6 +49,8 @@ struct file *file_reopen(struct file *file)
 
 /* Duplicate the file object including attributes and returns a new file for the
  * same inode as FILE. Returns a null pointer if unsuccessful. */
+/* 속성을 포함한 파일 객체를 복제하고 FILE과 동일한 INODE에 대한 새 파일을
+ * 반환합니다. 실패하면 null 포인터를 반환합니다. */
 struct file *file_duplicate(struct file *file)
 {
 	struct file *nfile = file_open(inode_reopen(file->inode));
@@ -77,6 +81,7 @@ void file_close(struct file *file)
 }
 
 /* Returns the inode encapsulated by FILE. */
+/* FILE로 캡슐화된 INODE를 반환합니다. */
 struct inode *file_get_inode(struct file *file)
 {
 	return file->inode;
@@ -103,6 +108,10 @@ off_t file_read(struct file *file, void *buffer, off_t size)
  * Returns the number of bytes actually read,
  * which may be less than SIZE if end of file is reached.
  * The file's current position is unaffected. */
+/* 파일의 오프셋 FILE_OFS부터 시작하여 FILE에서 BUFFER로
+ * SIZE 바이트를 읽습니다. 실제로 읽은 바이트 수를 반환하며,
+ * 파일 끝에 도달하면 SIZE보다 작을 수 있습니다.
+ * 파일의 현재 위치는 영향을 받지 않습니다. */
 off_t file_read_at(struct file *file, void *buffer, off_t size, off_t file_ofs)
 {
 	return inode_read_at(file->inode, buffer, size, file_ofs);
@@ -115,6 +124,11 @@ off_t file_read_at(struct file *file, void *buffer, off_t size, off_t file_ofs)
  * (Normally we'd grow the file in that case, but file growth is
  * not yet implemented.)
  * Advances FILE's position by the number of bytes read. */
+/* 파일의 현재 위치부터 시작하여 BUFFER에서 FILE로 SIZE 바이트를 씁니다.
+ * 파일 끝에 도달하면 실제로 쓰여진 바이트 수를 반환하며, 이 바이트 수는
+ * SIZE보다 작을 수 있습니다. (일반적으로 이 경우 파일을 늘릴 수 있지만
+ * 파일 증가는 아직 구현되지 않았습니다.) 읽은 바이트 수만큼 FILE의 위치를
+ * 전진시킵니다. */
 off_t file_write(struct file *file, const void *buffer, off_t size)
 {
 	off_t bytes_written = inode_write_at(file->inode, buffer, size, file->pos);
@@ -130,6 +144,10 @@ off_t file_write(struct file *file, const void *buffer, off_t size)
  * (Normally we'd grow the file in that case, but file growth is
  * not yet implemented.)
  * The file's current position is unaffected. */
+/* 파일의 오프셋 FILE_OFS부터 시작하여 BUFFER에서 FILE로 SIZE 바이트를 씁니다.
+ * 실제로 쓰여진 바이트 수를 반환하며, 파일 끝에 도달하면 SIZE보다 작을 수
+ * 있습니다. (일반적으로 이 경우 파일을 늘릴 수 있지만 파일 증가는 아직 구현되지
+ * 않았습니다.) 파일의 현재 위치는 영향을 받지 않습니다. */
 off_t file_write_at(struct file *file, const void *buffer, off_t size,
 					off_t file_ofs)
 {
@@ -138,6 +156,8 @@ off_t file_write_at(struct file *file, const void *buffer, off_t size,
 
 /* Prevents write operations on FILE's underlying inode
  * until file_allow_write() is called or FILE is closed. */
+/* file_allow_write()가 호출되거나 FILE이 닫힐 때까지
+ * FILE의 기본 이노드에 대한 쓰기 작업을 방지합니다. */
 void file_deny_write(struct file *file)
 {
 	ASSERT(file != NULL);
@@ -152,6 +172,9 @@ void file_deny_write(struct file *file)
 /* Re-enables write operations on FILE's underlying inode.
  * (Writes might still be denied by some other file that has the
  * same inode open.) */
+/* FILE의 기본 이노드에서 쓰기 작업을 다시 활성화합니다.
+ * (동일한 이노드가 열려 있는 다른 파일에 의해 여전히 쓰기가
+ * 거부될 수 있습니다.) */
 void file_allow_write(struct file *file)
 {
 	ASSERT(file != NULL);
@@ -164,6 +187,7 @@ void file_allow_write(struct file *file)
 }
 
 /* Returns the size of FILE in bytes. */
+/* FILE의 크기를 바이트 단위로 반환합니다. */
 off_t file_length(struct file *file)
 {
 	ASSERT(file != NULL);
@@ -185,6 +209,8 @@ void file_seek(struct file *file, off_t new_pos)
 
 /* Returns the current position in FILE as a byte offset from the
  * start of the file. */
+/* 파일 내 현재 위치를 파일의 시작 부분으로부터 바이트 오프셋으로
+ * 반환합니다. */
 off_t file_tell(struct file *file)
 {
 	ASSERT(file != NULL);
