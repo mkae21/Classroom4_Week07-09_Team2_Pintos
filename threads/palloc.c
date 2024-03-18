@@ -25,26 +25,45 @@
    By default, half of system RAM is given to the kernel pool and
    half to the user pool.  That should be huge overkill for the
    kernel pool, but that's just fine for demonstration purposes. */
+/* 페이지 할당자. 메모리를 페이지 크기(또는 페이지 배수)
+   청크로 나눠줍니다. 더 작은 청크를 나눠주는 얼로케이터는
+   malloc.h를 참고하세요.
+
+   시스템 메모리는 커널과 사용자 풀이라는 두 개의 "풀"로 나뉩니다.
+   사용자 풀은 사용자(가상) 메모리 페이지를 위한 것이고 커널 풀은
+   그 외 모든 것을 위한 것입니다. 사용자 프로세스가 미친 듯이
+   스왑하는 경우에도 커널은 자체 작업을 위한 메모리가 필요하다는
+   것이 이 아이디어의 핵심입니다.
+
+   기본적으로 시스템 RAM의 절반은 커널 풀에, 절반은 사용자 풀에
+   할당됩니다. 이는 커널 풀에 비해 지나치게 많은 양이지만
+   데모용으로는 괜찮습니다. */
 
 /* A memory pool. */
+/* 메모리 풀입니다. */
 struct pool
 {
 	struct lock lock;		 /* Mutual exclusion. */
+							 /* 상호 배제. */
 	struct bitmap *used_map; /* Bitmap of free pages. */
+							 /* 가용 페이지의 비트맵. */
 	uint8_t *base;			 /* Base of pool. */
+							 /* pool의 최하단. */
 };
 
 /* Two pools: one for kernel data, one for user pages. */
+/* 두 개의 풀: 하나는 커널 데이터용, 하나는 사용자 페이지용. */
 static struct pool kernel_pool, user_pool;
 
 /* Maximum number of pages to put in user pool. */
+/* 사용자 풀에 넣을 수 있는 최대 페이지 수입니다. */
 size_t user_page_limit = SIZE_MAX;
-static void
-init_pool(struct pool *p, void **bm_base, uint64_t start, uint64_t end);
 
+static void init_pool(struct pool *p, void **bm_base, uint64_t start, uint64_t end);
 static bool page_from_pool(const struct pool *, void *page);
 
 /* multiboot info */
+/* 멀티 부팅 정보 */
 struct multiboot_info
 {
 	uint32_t flags;
@@ -56,6 +75,7 @@ struct multiboot_info
 };
 
 /* e820 entry */
+/* E820 항목 */
 struct e820_entry
 {
 	uint32_t size;
@@ -67,6 +87,7 @@ struct e820_entry
 };
 
 /* Represent the range information of the ext_mem/base_mem */
+/* ext_mem/base_mem의 범위 정보를 나타냅니다. */
 struct area
 {
 	uint64_t start;
@@ -80,8 +101,8 @@ struct area
 #define APPEND_HILO(hi, lo) (((uint64_t)((hi)) << 32) + (lo))
 
 /* Iterate on the e820 entry, parse the range of basemem and extmem. */
-static void
-resolve_area_info(struct area *base_mem, struct area *ext_mem)
+/* e820 항목에 대해 반복하고, base_mem과 ext_mem의 범위를 구문 분석합니다. */
+static void resolve_area_info(struct area *base_mem, struct area *ext_mem)
 {
 	struct multiboot_info *mb_info = ptov(MULTIBOOT_INFO);
 	struct e820_entry *entries = ptov(mb_info->mmap_base);
@@ -100,6 +121,7 @@ resolve_area_info(struct area *base_mem, struct area *ext_mem)
 			struct area *area = start < BASE_MEM_THRESHOLD ? base_mem : ext_mem;
 
 			// First entry that belong to this area.
+			// 이 영역에 속하는 첫 번째 항목입니다.
 			if (area->size == 0)
 			{
 				*area = (struct area){
@@ -110,13 +132,17 @@ resolve_area_info(struct area *base_mem, struct area *ext_mem)
 			}
 			else
 			{ // otherwise
+				// 그렇지 않으면
 				// Extend start
+				// 시작 확장
 				if (area->start > start)
 					area->start = start;
 				// Extend end
+				// 끝 확장
 				if (area->end < end)
 					area->end = end;
 				// Extend size
+				// 크기 확장
 				area->size += size;
 			}
 		}
@@ -129,8 +155,11 @@ resolve_area_info(struct area *base_mem, struct area *ext_mem)
  * Basically, give half of memory to kernel, half to user.
  * We push base_mem portion to the kernel as much as possible.
  */
-static void
-populate_pools(struct area *base_mem, struct area *ext_mem)
+/* 풀을 채웁니다.
+ * 모든 페이지가 이 할당자에 의해 관리되며 코드 페이지도 포함됩니다.
+ * 기본적으로 메모리의 절반은 커널에, 절반은 사용자에게 할당합니다.
+ * 가능한 한 base_mem 부분을 커널에 푸시합니다. */
+static void populate_pools(struct area *base_mem, struct area *ext_mem)
 {
 	extern char _end;
 	void *free_start = pg_round_up(&_end);
@@ -140,6 +169,7 @@ populate_pools(struct area *base_mem, struct area *ext_mem)
 	uint64_t kern_pages = total_pages - user_pages;
 
 	// Parse E820 map to claim the memory region for each pool.
+	// E820 맵을 구문 분석하여 각 풀의 메모리 영역을 요청합니다.
 	enum
 	{
 		KERN_START,
@@ -179,9 +209,11 @@ populate_pools(struct area *base_mem, struct area *ext_mem)
 					break;
 				}
 				// generate kernel pool
+				// 커널 풀 생성
 				init_pool(&kernel_pool,
 						  &free_start, region_start, start + rem * PGSIZE);
 				// Transition to the next state
+				// 다음 상태로 전환
 				if (rem == size_in_pg)
 				{
 					rem = user_pages;
@@ -213,9 +245,11 @@ populate_pools(struct area *base_mem, struct area *ext_mem)
 	}
 
 	// generate the user pool
+	// 사용자 풀 생성
 	init_pool(&user_pool, &free_start, region_start, end);
 
 	// Iterate over the e820_entry. Setup the usable.
+	// e820_entry를 반복합니다. 사용 가능한 것을 설정합니다.
 	uint64_t usable_bound = (uint64_t)free_start;
 	struct pool *pool;
 	void *pool_end;
@@ -233,6 +267,8 @@ populate_pools(struct area *base_mem, struct area *ext_mem)
 
 			// TODO: add 0x1000 ~ 0x200000, This is not a matter for now.
 			// All the pages are unuable
+			// TODO: 0x1000 ~ 0x200000 추가, 지금은 문제가 되지 않습니다.
+			// 모든 페이지를 사용할 수 없습니다.
 			if (end < usable_bound)
 				continue;
 
@@ -265,11 +301,13 @@ populate_pools(struct area *base_mem, struct area *ext_mem)
 }
 
 /* Initializes the page allocator and get the memory size */
-uint64_t
-palloc_init(void)
+/* 페이지 할당자를 초기화하고 메모리 크기를 가져옵니다. */
+uint64_t palloc_init(void)
 {
 	/* End of the kernel as recorded by the linker.
 	   See kernel.lds.S. */
+	/* 링커에 의해 기록된 커널의 끝입니다.
+	   kernel.lds.S를 참조하십시오. */
 	extern char _end;
 	struct area base_mem = {.size = 0};
 	struct area ext_mem = {.size = 0};
@@ -375,12 +413,14 @@ void palloc_free_page(void *page)
 }
 
 /* Initializes pool P as starting at START and ending at END */
-static void
-init_pool(struct pool *p, void **bm_base, uint64_t start, uint64_t end)
+/* pool P를 START에서 시작하여 END에서 끝나는 것으로 초기화합니다. */
+static void init_pool(struct pool *p, void **bm_base, uint64_t start, uint64_t end)
 {
 	/* We'll put the pool's used_map at its base.
 	   Calculate the space needed for the bitmap
 	   and subtract it from the pool's size. */
+	/* pool의 used_map을 베이스에 넣겠습니다.
+	   비트맵에 필요한 공간을 계산하여 pool의 크기에서 뺍니다. */
 	uint64_t pgcnt = (end - start) / PGSIZE;
 	size_t bm_pages = DIV_ROUND_UP(bitmap_buf_size(pgcnt), PGSIZE) * PGSIZE;
 
@@ -389,6 +429,7 @@ init_pool(struct pool *p, void **bm_base, uint64_t start, uint64_t end)
 	p->base = (void *)start;
 
 	// Mark all to unusable.
+	// 모두 사용 불가능으로 표시합니다.
 	bitmap_set_all(p->used_map, true);
 
 	*bm_base += bm_pages;

@@ -749,6 +749,7 @@ static void init_thread(struct thread *t, const char *name, int priority)
 	// 현재 대기하고 있는 락을 가리키는 포인터이므로,
 	// 초기에는 어떤 락에도 대기하지 않는 상태(NULL)로 설정
 	t->origin_priority = priority;
+	t->next_fd = 3;
 	// for checking stackover flow
 	t->magic = THREAD_MAGIC;
 	list_init(&t->donations);

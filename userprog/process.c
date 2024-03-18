@@ -39,7 +39,6 @@ static void process_init(void)
  * before process_create_initd() returns. Returns the initd's
  * thread id, or TID_ERROR if the thread cannot be created.
  * Notice that THIS SHOULD BE CALLED ONCE. */
-
 /* 파일 이름에서 로드한 "initd"라는 첫 번째 유저랜드 프로그램을 시작합니다.
  * process_create_initd()가 반환되기 전에 새 스레드가 예약될 수 있으며
  * 종료될 수도 있습니다. initd의 스레드 ID를 반환하거나, 스레드를 생성할 수
@@ -96,48 +95,101 @@ static void initd(void *f_name)
 
 /* Clones the current process as `name`. Returns the new process's thread id, or
  * TID_ERROR if the thread cannot be created. */
+/* 현재 프로세스를 `name`으로 복제합니다. 새 프로세스의 스레드 ID를 반환하거나
+ * 스레드를 생성할 수 없는 경우 TID_ERROR를 반환합니다. */
 // tid_t process_fork(const char *name, struct intr_frame *if_ UNUSED)
 // {
-// 	/* Clone current thread to new thread.*/
+// 	/* Clone current thread to new thread. */
+//  /* 현재 스레드를 새 스레드로 복제합니다. */
 // 	return thread_create(name,
 // 						 PRI_DEFAULT, __do_fork, thread_current());
 // }
 tid_t process_fork(const char *name, struct intr_frame *if_)
 {
-	/* Clone current thread to new thread.*/
+	/* Clone current thread to new thread. */
+	/* 현재 스레드를 새 스레드로 복제합니다. */
 	return thread_create(name, PRI_DEFAULT, __do_fork, if_);
 }
 
 #ifndef VM
-/* Duplicate the parent's address space by passing this function to the
- * pml4_for_each. This is only for the project 2. */
-static bool
-duplicate_pte(uint64_t *pte, void *va, void *aux)
+// /* Duplicate the parent's address space by passing this function to the
+//  * pml4_for_each. This is only for the project 2. */
+// /* 이 함수를 pml4_for_ach에 전달하여 부모의 주소 공간을 복제합니다.
+//  * 이것은 프로젝트 2에만 해당됩니다. */
+// static bool duplicate_pte(uint64_t *pte, void *va, void *aux)
+// {
+// 	struct thread *current = thread_current();
+// 	struct thread *parent = (struct thread *)aux;
+// 	void *parent_page;
+// 	void *newpage;
+// 	bool writable;
+
+// 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
+// 	/* 1. TODO: 부모 페이지가 커널 페이지인 경우 즉시 반환합니다. */
+
+// 	/* 2. Resolve VA from the parent's page map level 4. */
+// 	/* 2. 상위 페이지 맵 레벨 4에서 VA를 해결합니다. */
+// 	parent_page = pml4_get_page(parent->pml4, va);
+
+// 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
+// 	 *    TODO: NEWPAGE. */
+// 	/* 3. TODO: 자식에게 새 PAL_USER 페이지를 할당하고
+// 	 *    TODO: 결과를 NEWPAGE로 설정합니다. */
+
+// 	/* 4. TODO: Duplicate parent's page to the new page and
+// 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
+// 	 *    TODO: according to the result). */
+// 	/* 4. TODO: 부모 페이지를 새 페이지에 복제하고
+// 		  TODO: 부모 페이지가 쓰기 가능한지 여부를 확인합니다.
+// 		  TODO: (결과에 따라 쓰기 가능으로 설정). */
+
+// 	/* 5. Add new page to child's page table at address VA with WRITABLE
+// 	 *    permission. */
+// 	/* 5. 쓰기 권한이 있는 주소 VA의 하위 페이지 테이블에 새 페이지를
+// 	 *    추가합니다. */
+// 	if (!pml4_set_page(current->pml4, va, newpage, writable))
+// 	{
+// 		/* 6. TODO: if fail to insert page, do error handling. */
+// 		/* 6. TODO: 페이지 삽입에 실패하면 오류 처리를 수행합니다. */
+// 	}
+// 	return true;
+// }
+
+/* 이 함수를 pml4_for_ach에 전달하여 부모의 주소 공간을 복제합니다.
+ * 이것은 프로젝트 2에만 해당됩니다. */
+static bool duplicate_pte(uint64_t *pte, void *va, void *aux)
 {
 	struct thread *current = thread_current();
 	struct thread *parent = (struct thread *)aux;
-	void *parent_page;
-	void *newpage;
-	bool writable;
 
-	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
+	/* 1. TODO: 부모 페이지가 커널 페이지인 경우 즉시 반환합니다. */
+	if (is_kernel_vaddr(va))
+	{
+		return true;
+	}
 
-	/* 2. Resolve VA from the parent's page map level 4. */
-	parent_page = pml4_get_page(parent->pml4, va);
+	/* 2. 상위 페이지 맵 레벨 4에서 VA를 해결합니다. */
+	void *parent_page = pml4_get_page(parent->pml4, va);
 
-	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
-	 *    TODO: NEWPAGE. */
+	/* 3. TODO: 자식에게 새 PAL_USER 페이지를 할당하고
+	 *    TODO: 결과를 NEWPAGE로 설정합니다. */
+	void *newpage = palloc_get_page(PAL_USER);
 
-	/* 4. TODO: Duplicate parent's page to the new page and
-	 *    TODO: check whether parent's page is writable or not (set WRITABLE
-	 *    TODO: according to the result). */
+	/* 4. TODO: 부모 페이지를 새 페이지에 복제하고
+		  TODO: 부모 페이지가 쓰기 가능한지 여부를 확인합니다.
+		  TODO: (결과에 따라 쓰기 가능으로 설정). */
+	memcpy(newpage, parent_page, PGSIZE);
+	bool writable = is_writable(pte);
 
-	/* 5. Add new page to child's page table at address VA with WRITABLE
-	 *    permission. */
+	/* 5. 쓰기 권한이 있는 주소 VA의 하위 페이지 테이블에 새 페이지를
+	 *    추가합니다. */
 	if (!pml4_set_page(current->pml4, va, newpage, writable))
 	{
-		/* 6. TODO: if fail to insert page, do error handling. */
+		/* 6. TODO: 페이지 삽입에 실패하면 오류 처리를 수행합니다. */
+		palloc_free_page(newpage);
+		return false;
 	}
+
 	return true;
 }
 #endif
@@ -146,12 +198,16 @@ duplicate_pte(uint64_t *pte, void *va, void *aux)
  * Hint) parent->tf does not hold the userland context of the process.
  *       That is, you are required to pass second argument of process_fork to
  *       this function. */
+/* 부모 프로세스의 실행 컨텍스트를 복사하는 스레드 함수입니다.
+ * 힌트) parent->tf는 프로세스의 유저랜드 컨텍스트를 보유하지 않습니다.
+ *       즉, 이 함수에 process_fork의 두 번째 인수를 전달해야 합니다. */
 // static void __do_fork(void *aux)
 // {
 // 	struct intr_frame if_;
 // 	struct thread *parent = (struct thread *)aux;
 // 	struct thread *current = thread_current();
 // 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
+//  /* TODO: 어떻게든 부모_if를 전달해야 합니다. (즉, process_fork() 의 if_) * /
 // 	struct intr_frame *parent_if;
 // 	bool succ = true;
 
@@ -188,10 +244,9 @@ duplicate_pte(uint64_t *pte, void *va, void *aux)
 // 	thread_exit();
 // }
 
-/* A thread function that copies parent's execution context.
- * Hint) parent->tf does not hold the userland context of the process.
- *       That is, you are required to pass second argument of process_fork to
- *       this function. */
+/* 부모 프로세스의 실행 컨텍스트를 복사하는 스레드 함수입니다.
+ * 힌트) parent->tf는 프로세스의 유저랜드 컨텍스트를 보유하지 않습니다.
+ *       즉, 이 함수에 process_fork의 두 번째 인수를 전달해야 합니다. */
 static void __do_fork(void *aux)
 {
 	struct intr_frame if_;
@@ -199,10 +254,10 @@ static void __do_fork(void *aux)
 	struct thread *current = thread_current();
 	bool succ = true;
 
-	/* 1. Read the cpu context to local stack. */
+	/* 1. CPU 컨텍스트를 로컬 스택으로 읽습니다. */
 	memcpy(&if_, &parent->tf, sizeof(struct intr_frame));
 
-	/* 2. Duplicate PT */
+	/* 2. PT 복제 */
 	current->pml4 = pml4_create();
 
 	if (current->pml4 == NULL)
@@ -221,17 +276,19 @@ static void __do_fork(void *aux)
 		goto error;
 #endif
 
-	/* TODO: Your code goes here.
-	 * TODO: Hint) To duplicate the file object, use `file_duplicate`
-	 * TODO:       in include/filesys/file.h. Note that parent should not return
-	 * TODO:       from the fork() until this function successfully duplicates
-	 * TODO:       the resources of parent.*/
+	/* TODO: 당신의 코드는 여기에 구현되어야 합니다.
+	 * TODO: 힌트) 파일 객체를 복제하려면 `include/filesys/file.h`에서
+	 * TODO:       `file_duplicate`를 사용합니다. 이 함수가 부모의 리소스를
+	 * TODO:       성공적으로 복제할 때까지 부모는 fork()에서 반환되지 않아야
+	 * TODO:       합니다.
+	 */
 	if (parent->next_fd == FDT_COUNT_LIMIT)
 	{
 		goto error;
 	}
 
 	/* Duplicate the file descriptor table */
+	/* 파일 디스크립터 테이블 복제 */
 	for (int i = 0; i < FDT_COUNT_LIMIT; i++)
 	{
 		struct file *file = parent->fdt[i];
@@ -242,6 +299,7 @@ static void __do_fork(void *aux)
 		}
 
 		/* Duplicate the file and store it in the child's file descriptor table */
+		/* 파일을 복제하여 하위 파일 디스크립터 테이블에 저장합니다. */
 		current->fdt[i] = file_duplicate(file);
 
 		if (current->fdt[i] == NULL)
@@ -251,9 +309,11 @@ static void __do_fork(void *aux)
 	}
 
 	/* Copy the next available file descriptor index */
+	/* 사용 가능한 다음 파일 디스크립터 인덱스 복사 */
 	current->next_fd = parent->next_fd;
 
 	/* Duplicate the current working directory */
+	/* 현재 작업 디렉터리 복제 */
 	if (parent->cwd != NULL)
 	{
 		current->cwd = dir_reopen(parent->cwd);
@@ -267,6 +327,7 @@ static void __do_fork(void *aux)
 	process_init();
 
 	/* Finally, switch to the newly created process. */
+	/* 마지막으로 새로 생성된 프로세스로 전환합니다. */
 	if (succ)
 	{
 		do_iret(&if_);
@@ -279,15 +340,15 @@ error:
 
 /* Switch the current execution context to the f_name.
  * Returns -1 on fail. */
-/*실행 되어야 하는 명령줄 받을 때 함수명과 매개변수를 분리해 주는 것
-현재 실행 context에서 f_name 으로 switch하라*/
-
+/* 현재 실행 컨텍스트를 f_name으로 전환합니다.
+ * 실패하면 -1을 반환합니다. */
+/* 실행 되어야 하는 명령줄 받을 때 함수명과 매개변수를 분리해 주는 것
+ * 현재 실행 context에서 f_name 으로 switch하라 */
 int process_exec(void *f_name)
 {
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
 	 * it stores the execution information to the member. */
-
 	/* 스레드 구조에서는 intr_frame을 사용할 수 없습니다.
 	 * 현재 스레드가 스케줄을 변경할 때
 	 * 실행 정보를 멤버에 저장하기 때문입니다. */
@@ -301,14 +362,13 @@ int process_exec(void *f_name)
 	/* 먼저 현재 컨텍스트를 종료합니다. */
 	process_cleanup();
 
-	// hex_dump(,,,NULL);
 	/* And then load the binary */
 	/* 그런 다음 바이너리를 로드합니다. */
 
-	/* +1 하는 이유: 마지막 NULL요소 넣기 위해*/
+	/* +1 하는 이유: 마지막 NULL요소 넣기 위해 */
 	char *argv[LOADER_ARGS_LEN / 2 + 1];
 
-	/* '\0' == NULL 문자*/
+	/* '\0' == NULL 문자 */
 	char *save_ptr;
 	int argc = 0;
 
@@ -322,7 +382,8 @@ int process_exec(void *f_name)
 	_if.R.rdi = argc;
 
 	bool success = load(f_name, &_if);
-	/*string 저장*/
+
+	/* string 저장 */
 	char *addrs[LOADER_ARGS_LEN / 2 + 1];
 
 	for (int i = argc - 1; i >= 0; i--)
@@ -332,7 +393,7 @@ int process_exec(void *f_name)
 		addrs[i] = _if.rsp;
 	}
 
-	/*for padding*/
+	/* for padding */
 	int total = 0;
 
 	for (int k = argc - 1; k >= 0; k--)
@@ -346,11 +407,11 @@ int process_exec(void *f_name)
 	_if.rsp -= padding;
 	memset(_if.rsp, 0, padding);
 
-	/*blank*/
+	/* blank */
 	_if.rsp -= sizeof(_if.rsp);
 	memset(_if.rsp, 0, sizeof(_if.rsp));
 
-	/*주소 값 저장*/
+	/* 주소 값 저장 */
 	for (int j = argc - 1; j >= 0; j--)
 	{
 		_if.rsp -= sizeof(_if.rsp);
@@ -364,7 +425,7 @@ int process_exec(void *f_name)
 	// Gitbook에 적힌 내용 구현
 	_if.R.rsi = _if.rsp;
 
-	/*0 반환 값 저장*/
+	/* 0 반환 값 저장 */
 	_if.rsp -= sizeof(void *);
 	memset(_if.rsp, 0, sizeof(void *));
 
@@ -701,7 +762,7 @@ static bool load(const char *file_name, struct intr_frame *if_)
 		goto done;
 	}
 
-	/*프로세스 실행*/
+	/* 프로세스 실행 */
 	process_activate(thread_current());
 	/* Open executable file. */
 	/* 실행 파일을 엽니다. */
@@ -711,21 +772,19 @@ static bool load(const char *file_name, struct intr_frame *if_)
 
 	if (file == NULL)
 	{
-		// printf("load: %s: open failed\n", file_name);
-		printf("load: %s: 열지 못함\n", file_name);
+		printf("load: %s: open failed\n", file_name);
 		goto done;
 	}
 
 	/* Read and verify executable header. */
 	/* 실행 파일 헤더를 읽고 확인합니다. */
-	/*ELF = 파일의 형식, header + data 구조*/
+	/* ELF = 파일의 형식, header + data 구조 */
 	struct ELF ehdr;
 
 	if (file_read(file, &ehdr, sizeof ehdr) != sizeof ehdr || memcmp(ehdr.e_ident, "\177ELF\2\1\1", 7) || ehdr.e_type != 2 || ehdr.e_machine != 0x3E // amd64
 		|| ehdr.e_version != 1 || ehdr.e_phentsize != sizeof(struct Phdr) || ehdr.e_phnum > 1024)
 	{
-		// printf("load: %s: error loading executable\n", file_name);
-		printf("load: %s: 실행 파일 로딩 오류\n", file_name);
+		printf("load: %s: error loading executable\n", file_name);
 		goto done;
 	}
 
@@ -814,8 +873,7 @@ static bool load(const char *file_name, struct intr_frame *if_)
 	/* Set up stack. */
 	/* 스택을 설정합니다. */
 	// 전부 메모리로 올린 뒤에 스택을 만드는 과정이 실행
-	/*rsp로 user_stack 저장*/
-
+	/* rsp로 user_stack 저장 */
 	if (!setup_stack(if_))
 	{
 		goto done;
@@ -828,8 +886,8 @@ static bool load(const char *file_name, struct intr_frame *if_)
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
-	/* 할 일: 코드가 여기로 이동합니다.
-	 * 할 일: 인수 전달을 구현합니다. (project2/argument_passing.html 참조) */
+	/* TODO: 코드가 여기로 이동합니다.
+	 * TODO: 인수 전달을 구현합니다. (project2/argument_passing.html 참조) */
 
 	// 들어온 입력을 파싱해 USER_STACK에 채워넣는 루틴 추가
 	// 만약 입력으로 들어오는 명령이 argument를 포함하고 있다면 load()의 코드에서 filename이 이제 진정한 파일의 이름이 아닐 수 있음
@@ -837,7 +895,7 @@ static bool load(const char *file_name, struct intr_frame *if_)
 
 	// 파싱을 위해서 매뉴얼에서는 strtok_r() 함수를 사용할 것을 권장하고 있기에, 이를 사용
 	// 사소하지만 중요한 사항으로, 포인터 변수의 크기가 8 바이트씩이라는 것을 잊지 말기
-	// process_exec() 함수 내부
+	// -> 현재 우리 조는 파싱을 load() 함수 외부인 process_exec()에서 진행하고 있음
 	success = true;
 done:
 	/* We arrive here whether the load is successful or not. */
@@ -911,8 +969,12 @@ static bool validate_segment(const struct Phdr *phdr, struct file *file)
 /* Codes of this block will be ONLY USED DURING project 2.
  * If you want to implement the function for whole project 2, implement it
  * outside of #ifndef macro. */
+/* 이 블록의 코드는 프로젝트 2에서만 사용됩니다.
+ * 전체 프로젝트 2에 대해 함수를 구현하려면 #ifndef 매크로 외부에서
+ * 구현하세요. */
 
 /* load() helpers. */
+/* load() 헬퍼. */
 static bool install_page(void *upage, void *kpage, bool writable);
 
 /* Loads a segment starting at offset OFS in FILE at address
