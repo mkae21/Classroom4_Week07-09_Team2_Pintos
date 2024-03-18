@@ -96,11 +96,16 @@ static void initd(void *f_name)
 
 /* Clones the current process as `name`. Returns the new process's thread id, or
  * TID_ERROR if the thread cannot be created. */
-tid_t process_fork(const char *name, struct intr_frame *if_ UNUSED)
+// tid_t process_fork(const char *name, struct intr_frame *if_ UNUSED)
+// {
+// 	/* Clone current thread to new thread.*/
+// 	return thread_create(name,
+// 						 PRI_DEFAULT, __do_fork, thread_current());
+// }
+tid_t process_fork(const char *name, struct intr_frame *if_)
 {
 	/* Clone current thread to new thread.*/
-	return thread_create(name,
-						 PRI_DEFAULT, __do_fork, thread_current());
+	return thread_create(name, PRI_DEFAULT, __do_fork, if_);
 }
 
 #ifndef VM
@@ -141,25 +146,72 @@ duplicate_pte(uint64_t *pte, void *va, void *aux)
  * Hint) parent->tf does not hold the userland context of the process.
  *       That is, you are required to pass second argument of process_fork to
  *       this function. */
-static void
-__do_fork(void *aux)
+// static void __do_fork(void *aux)
+// {
+// 	struct intr_frame if_;
+// 	struct thread *parent = (struct thread *)aux;
+// 	struct thread *current = thread_current();
+// 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
+// 	struct intr_frame *parent_if;
+// 	bool succ = true;
+
+// 	/* 1. Read the cpu context to local stack. */
+// 	memcpy(&if_, parent_if, sizeof(struct intr_frame));
+
+// 	/* 2. Duplicate PT */
+// 	current->pml4 = pml4_create();
+// 	if (current->pml4 == NULL)
+// 		goto error;
+
+// 	process_activate(current);
+// #ifdef VM
+// 	supplemental_page_table_init(&current->spt);
+// 	if (!supplemental_page_table_copy(&current->spt, &parent->spt))
+// 		goto error;
+// #else
+// 	if (!pml4_for_each(parent->pml4, duplicate_pte, parent))
+// 		goto error;
+// #endif
+
+// 	/* TODO: Your code goes here.
+// 	 * TODO: Hint) To duplicate the file object, use `file_duplicate`
+// 	 * TODO:       in include/filesys/file.h. Note that parent should not return
+// 	 * TODO:       from the fork() until this function successfully duplicates
+// 	 * TODO:       the resources of parent.*/
+
+// 	process_init();
+
+// 	/* Finally, switch to the newly created process. */
+// 	if (succ)
+// 		do_iret(&if_);
+// error:
+// 	thread_exit();
+// }
+
+/* A thread function that copies parent's execution context.
+ * Hint) parent->tf does not hold the userland context of the process.
+ *       That is, you are required to pass second argument of process_fork to
+ *       this function. */
+static void __do_fork(void *aux)
 {
 	struct intr_frame if_;
 	struct thread *parent = (struct thread *)aux;
 	struct thread *current = thread_current();
-	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
-	struct intr_frame *parent_if;
 	bool succ = true;
 
 	/* 1. Read the cpu context to local stack. */
-	memcpy(&if_, parent_if, sizeof(struct intr_frame));
+	memcpy(&if_, &parent->tf, sizeof(struct intr_frame));
 
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
+
 	if (current->pml4 == NULL)
+	{
 		goto error;
+	}
 
 	process_activate(current);
+
 #ifdef VM
 	supplemental_page_table_init(&current->spt);
 	if (!supplemental_page_table_copy(&current->spt, &parent->spt))
@@ -174,13 +226,54 @@ __do_fork(void *aux)
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
+	if (parent->next_fd == FDT_COUNT_LIMIT)
+	{
+		goto error;
+	}
+
+	/* Duplicate the file descriptor table */
+	for (int i = 0; i < FDT_COUNT_LIMIT; i++)
+	{
+		struct file *file = parent->fdt[i];
+
+		if (file == NULL)
+		{
+			continue;
+		}
+
+		/* Duplicate the file and store it in the child's file descriptor table */
+		current->fdt[i] = file_duplicate(file);
+
+		if (current->fdt[i] == NULL)
+		{
+			goto error;
+		}
+	}
+
+	/* Copy the next available file descriptor index */
+	current->next_fd = parent->next_fd;
+
+	/* Duplicate the current working directory */
+	if (parent->cwd != NULL)
+	{
+		current->cwd = dir_reopen(parent->cwd);
+
+		if (current->cwd == NULL)
+		{
+			goto error;
+		}
+	}
 
 	process_init();
 
 	/* Finally, switch to the newly created process. */
 	if (succ)
+	{
 		do_iret(&if_);
+	}
+
 error:
+	current->exit_status = TID_ERROR;
 	thread_exit();
 }
 
@@ -318,27 +411,54 @@ int process_exec(void *f_name)
 // 	 * 구현하기 전에 여기에 무한 루프를 추가하는 것이 좋습니다. */
 // 	return -1;
 // }
-int process_wait(tid_t child_tid)
-{
-	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
-	 * XXX:       to add infinite loop here before
-	 * XXX:       implementing the process_wait. */
-	/* 힌트) process_wait(initd)를 실행하면 핀토스가 종료되므로, process_wait을
-	 * 구현하기 전에 여기에 무한 루프를 추가하는 것이 좋습니다. */
 
-	// 프로세스가 다른 system call이 처리될 때까지 충분히 기다림
-	// 단, 이는 프로세스가 종료될 때까지 기다리는 것이 아니라, 다른 system call이 처리될 때까지 기다리는 것
-	while (true)
+struct thread *get_child_by_tid(struct thread *curr, tid_t child_tid)
+{
+	struct thread *child = NULL;
+
+	/* 해당 자식 프로세스를 찾기 위해 현재 프로세스의 자식 리스트를 순회 */
+	for (struct list_elem *e = list_begin(&curr->children); e != list_end(&curr->children); e = list_next(e))
 	{
-		barrier();
+		struct thread *t = list_entry(e, struct thread, child_elem);
+
+		if (t->tid == child_tid)
+		{
+			child = t;
+			break;
+		}
 	}
 
-	// for (int i = 0; i < 1000000000; i++)
-	// {
-	// 	// barrier();
-	// }
+	return child;
+}
 
-	return -1;
+/* 자식 프로세스가 종료될 때까지 대기하고 종료 상태를 반환하는 함수 */
+int process_wait(tid_t child_tid)
+{
+	struct thread *curr = thread_current();
+	struct thread *child = get_child_by_tid(curr, child_tid);
+
+	/* 해당 자식 프로세스가 존재하지 않는 경우 */
+	if (child == NULL)
+	{
+		/* 대기 시간을 주기 위해 일정 시간 동안 대기 */
+		timer_sleep(100); // 100 ticks 동안 대기 (적절한 값으로 조정 가능)
+		return -1;
+	}
+
+	/* 자식 프로세스가 종료될 때까지 대기 */
+	sema_down(&child->wait_sema);
+
+	/* 자식 프로세스의 종료 상태를 가져옴 */
+	int exit_status = child->exit_status;
+
+	/* 자식 프로세스를 부모의 자식 리스트에서 제거 */
+	list_remove(&child->child_elem);
+
+	/* 자식 프로세스의 메모리를 해제 */
+	palloc_free_page(child);
+
+	/* 자식 프로세스의 종료 상태를 반환 */
+	return exit_status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -355,71 +475,109 @@ int process_wait(tid_t child_tid)
 // 	 * 여기에서 프로세스 리소스 정리를 구현하는 것이 좋습니다. */
 // 	process_cleanup();
 // }
+
+/* 프로세스를 종료하는 함수 */
 void process_exit(void)
 {
 	struct thread *curr = thread_current();
 
-	// // 프로세스 종료 메시지 출력
-	// printf("%s: exit(%d)\n", curr->name, curr->exit_status);
+	/* 프로세스 종료 메시지를 출력
+	 * 프로세스 이름과 종료 상태를 출력 */
+	printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 
-	// // 자식 프로세스들이 종료될 때까지 대기
-	// while (!list_empty(&curr->child_elem))
-	// {
-	// 	struct thread *child = list_entry(list_pop_front(&curr->children), struct thread, child_elem);
-	// 	sema_up(&child->wait_sema);
-	// 	free(child);
-	// }
+	/* 부모 프로세스가 자식 프로세스의 종료를 알 수 있도록 wait_sema를 up */
+	// TODO: 아래 코드 필요 있는 지 논의 필요 - Hyeonwoo, 2024.03.18
+	// sema_up(&curr->wait_sema);
 
-	// // 파일 디스크립터 테이블 정리
-	// for (int i = 0; i < FDT_COUNT_LIMIT; i++)
-	// {
-	// 	if (curr->fdt[i] != NULL)
-	// 	{
-	// 		file_close(curr->fdt[i]);
-	// 		curr->fdt[i] = NULL;
-	// 	}
-	// }
+	/* 파일 디스크립터 테이블 정리
+	 * 프로세스가 열어둔 파일들을 모두 닫고 파일 디스크립터 테이블을 초기화 */
+	for (int i = 0; i < FDT_COUNT_LIMIT; i++)
+	{
+		if (curr->fdt[i] != NULL)
+		{
+			file_close(curr->fdt[i]);
+			curr->fdt[i] = NULL;
+		}
+	}
 
-	// 프로세스 리소스 정리
+	/* 프로세스의 리소스를 정리하기 위해 process_cleanup() 함수 호출 */
 	process_cleanup();
 }
 
 /* Free the current process's resources. */
 /* 현재 프로세스의 리소스를 해제합니다. */
-static void process_cleanup(void)
+// static void process_cleanup(void)
+// {
+// 	struct thread *curr = thread_current();
+
+// #ifdef VM
+// 	supplemental_page_table_kill(&curr->spt);
+// #endif
+
+// 	/* Destroy the current process's page directory and switch back
+// 	 * to the kernel-only page directory. */
+// 	/* 현재 프로세스의 페이지 디렉터리를 삭제하고
+// 	 * 커널 전용 페이지 디렉터리로 다시 전환합니다. */
+// 	uint64_t *pml4 = curr->pml4;
+
+// 	if (pml4 != NULL)
+// 	{
+// 		/* Correct ordering here is crucial.  We must set
+// 		 * cur->pagedir to NULL before switching page directories,
+// 		 * so that a timer interrupt can't switch back to the
+// 		 * process page directory.  We must activate the base page
+// 		 * directory before destroying the process's page
+// 		 * directory, or our active page directory will be one
+// 		 * that's been freed (and cleared). */
+// 		/* 여기서 올바른 순서가 중요합니다. 타이머 인터럽트가
+// 		 * 프로세스 페이지 디렉토리로 다시 전환할 수 없도록
+// 		 * 페이지 디렉터리를 전환하기 전에 cur->pagedir을 NULL로
+// 		 * 설정해야 합니다. 프로세스의 페이지 디렉터리를 삭제하기
+// 		 * 전에 기본 페이지 디렉터리를 활성화해야 하며, 그렇지
+// 		 * 않으면 활성 페이지 디렉터리가 해제된(그리고 지워진)
+// 		 * 디렉터리가 됩니다. */
+// 		curr->pml4 = NULL;
+
+// 		pml4_activate(NULL);
+// 		pml4_destroy(pml4);
+// 	}
+// }
+
+/* 프로세스의 리소스를 정리하는 함수 */
+void process_cleanup(void)
 {
 	struct thread *curr = thread_current();
 
-#ifdef VM
-	supplemental_page_table_kill(&curr->spt);
-#endif
-
-	/* Destroy the current process's page directory and switch back
-	 * to the kernel-only page directory. */
-	/* 현재 프로세스의 페이지 디렉터리를 삭제하고
-	 * 커널 전용 페이지 디렉터리로 다시 전환합니다. */
+	/* 현재 프로세스의 페이지 디렉토리를 NULL로 설정 */
 	uint64_t *pml4 = curr->pml4;
 
 	if (pml4 != NULL)
 	{
-		/* Correct ordering here is crucial.  We must set
-		 * cur->pagedir to NULL before switching page directories,
-		 * so that a timer interrupt can't switch back to the
-		 * process page directory.  We must activate the base page
-		 * directory before destroying the process's page
-		 * directory, or our active page directory will be one
-		 * that's been freed (and cleared). */
-		/* 여기서 올바른 순서가 중요합니다. 타이머 인터럽트가
-		 * 프로세스 페이지 디렉토리로 다시 전환할 수 없도록
-		 * 페이지 디렉터리를 전환하기 전에 cur->pagedir을 NULL로
-		 * 설정해야 합니다. 프로세스의 페이지 디렉터리를 삭제하기
-		 * 전에 기본 페이지 디렉터리를 활성화해야 하며, 그렇지
-		 * 않으면 활성 페이지 디렉터리가 해제된(그리고 지워진)
-		 * 디렉터리가 됩니다. */
+		/* 현재 프로세스의 페이지 테이블 활성화 */
 		curr->pml4 = NULL;
-
 		pml4_activate(NULL);
+
+		/* 페이지 디렉토리에 할당된 모든 페이지 테이블 삭제 */
 		pml4_destroy(pml4);
+	}
+
+	/* 파일 디스크립터 테이블 정리 */
+	for (int i = 0; i < FDT_COUNT_LIMIT; i++)
+	{
+		if (curr->fdt[i] != NULL)
+		{
+			file_close(curr->fdt[i]);
+			curr->fdt[i] = NULL;
+		}
+	}
+
+	/* 현재 프로세스의 모든 자식 프로세스를 찾아 메모리 해제 */
+	while (!list_empty(&curr->children))
+	{
+		struct list_elem *e = list_pop_front(&curr->children);
+		struct thread *child = list_entry(e, struct thread, child_elem);
+		list_remove(e);
+		free(child);
 	}
 }
 
