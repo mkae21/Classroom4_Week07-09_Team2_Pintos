@@ -7,6 +7,7 @@
 #include "intrinsic.h"
 
 /* Number of page faults processed. */
+/* 처리된 페이지 오류 수입니다. */
 static long long page_fault_cnt;
 
 static void kill(struct intr_frame *);
@@ -27,12 +28,29 @@ static void page_fault(struct intr_frame *);
 
    Refer to [IA32-v3a] section 5.15 "Exception and Interrupt
    Reference" for a description of each of these exceptions. */
+/* 사용자 프로그램에 의해 발생할 수 있는 인터럽트에 대한 핸들러를
+   등록합니다.
+
+   실제 유닉스와 유사한 OS에서는 이러한 인터럽트 대부분이
+   [SV-386] 3-24 및 3-25에 설명된 대로 신호 형태로 사용자
+   프로세스에 전달되지만, 여기서는 신호를 구현하지 않습니다.
+   대신 사용자 프로세스를 단순히 종료하도록 만들 것입니다.
+
+   페이지 오류는 예외입니다. 여기서는 다른 예외와 같은 방식으로
+   처리되지만 가상 메모리를 구현하려면 변경해야 합니다.
+
+   이러한 각 예외에 대한 설명은 [IA32-v3a] 섹션 5.15 "예외 및
+   인터럽트 참조"를 참조하세요.*/
 void exception_init(void)
 {
 	/* These exceptions can be raised explicitly by a user program,
 	   e.g. via the INT, INT3, INTO, and BOUND instructions.  Thus,
 	   we set DPL==3, meaning that user programs are allowed to
 	   invoke them via these instructions. */
+	/* 이러한 예외는 사용자 프로그램에서 명시적으로 발생시킬 수
+	   있습니다. (예: INT, INT3, INTO 및 BOUND 명령어) 따라서 사용자
+	   프로그램이 이러한 명령어를 통해 호출할 수 있도록 DPL==3으로
+	   설정했습니다. */
 	intr_register_int(3, 3, INTR_ON, kill, "#BP Breakpoint Exception");
 	intr_register_int(4, 3, INTR_ON, kill, "#OF Overflow Exception");
 	intr_register_int(5, 3, INTR_ON, kill,
@@ -42,6 +60,9 @@ void exception_init(void)
 	   invoking them via the INT instruction.  They can still be
 	   caused indirectly, e.g. #DE can be caused by dividing by
 	   0.  */
+	/* 이러한 예외는 DPL==0이므로, 사용자 프로세스가 INT 명령어를
+	   통해 호출할 수 없습니다. 여전히 간접적으로 발생할 수 있습니다.
+	   예를 들어 #DE는 0으로 나누면 발생할 수 있습니다. */
 	intr_register_int(0, 0, INTR_ON, kill, "#DE Divide Error");
 	intr_register_int(1, 0, INTR_ON, kill, "#DB Debug Exception");
 	intr_register_int(6, 0, INTR_ON, kill, "#UD Invalid Opcode Exception");
@@ -57,18 +78,22 @@ void exception_init(void)
 	/* Most exceptions can be handled with interrupts turned on.
 	   We need to disable interrupts for page faults because the
 	   fault address is stored in CR2 and needs to be preserved. */
+	/* 대부분의 예외는 인터럽트를 켠 상태로 처리할 수 있습니다.
+	   페이지 오류는 오류 주소가 CR2에 저장되고 보존되어야 하므로
+	   페이지 오류에 대한 인터럽트를 비활성화해야 합니다. */
 	intr_register_int(14, 0, INTR_OFF, page_fault, "#PF Page-Fault Exception");
 }
 
 /* Prints exception statistics. */
+/* 예외 통계를 출력합니다. */
 void exception_print_stats(void)
 {
 	printf("Exception: %lld page faults\n", page_fault_cnt);
 }
 
 /* Handler for an exception (probably) caused by a user process. */
-static void
-kill(struct intr_frame *f)
+/* 사용자 프로세스로 인해 발생한 (아마도) 예외에 대한 핸들러. */
+static void kill(struct intr_frame *f)
 {
 	/* This interrupt is one (probably) caused by a user process.
 	   For example, the process might have tried to access unmapped
@@ -77,14 +102,25 @@ kill(struct intr_frame *f)
 	   the kernel.  Real Unix-like operating systems pass most
 	   exceptions back to the process via signals, but we don't
 	   implement them. */
+	/* 이 인터럽트는 (아마도) 사용자 프로세스에 의해 발생한
+	   인터럽트입니다. 예를 들어 프로세스가 매핑되지 않은 가상
+	   메모리에 액세스하려고 시도했을 수 있습니다(페이지 오류).
+	   지금은 단순히 사용자 프로세스를 종료합니다. 나중에 커널에서
+	   페이지 오류를 처리하고 싶을 것입니다. 실제 유닉스 계열
+	   운영체제는 대부분의 예외를 시그널을 통해 프로세스에
+	   전달하지만, 저희는 이를 구현하지 않습니다. */
 
 	/* The interrupt frame's code segment value tells us where the
 	   exception originated. */
+	/* 인터럽트 프레임의 코드 세그먼트 값은
+	   예외가 발생한 위치를 알려줍니다. */
 	switch (f->cs)
 	{
 	case SEL_UCSEG:
 		/* User's code segment, so it's a user exception, as we
 		   expected.  Kill the user process.  */
+		/* 사용자의 코드 세그먼트이므로 예상대로 사용자 예외입니다.
+		   사용자 프로세스를 종료합니다. */
 		printf("%s: dying due to interrupt %#04llx (%s).\n",
 			   thread_name(), f->vec_no, intr_name(f->vec_no));
 		intr_dump_frame(f);
@@ -95,12 +131,18 @@ kill(struct intr_frame *f)
 		   Kernel code shouldn't throw exceptions.  (Page faults
 		   may cause kernel exceptions--but they shouldn't arrive
 		   here.)  Panic the kernel to make the point.  */
+		/* 커널의 코드 세그먼트로, 커널 버그를 나타냅니다.
+		   커널 코드는 예외를 던지지 않아야 합니다. (페이지 오류로
+		   인해 커널 예외가 발생할 수 있지만 여기에 도달해서는
+		   안 됩니다.) 커널을 패닉시켜 요점을 파악하세요. */
 		intr_dump_frame(f);
 		PANIC("Kernel bug - unexpected interrupt in kernel");
 
 	default:
 		/* Some other code segment?  Shouldn't happen.  Panic the
 		   kernel. */
+		/* 다른 코드 세그먼트? 이런 일은 일어나지 않아야 합니다.
+		   커널을 패닉시킵니다. */
 		printf("Interrupt %#04llx (%s) in unknown segment %04x\n",
 			   f->vec_no, intr_name(f->vec_no), f->cs);
 		thread_exit();

@@ -154,7 +154,7 @@ void syscall_handler(struct intr_frame *f)
 /* 주어진 사용자 포인터가 유효한지 확인합니다. */
 static bool is_valid_user_ptr(const void *uaddr)
 {
-	return (uaddr != NULL) && is_user_vaddr(uaddr);
+	return (uaddr != NULL) && is_user_vaddr(uaddr) && pml4_get_page(thread_current()->pml4, uaddr) != NULL;
 }
 
 /* Checks if the given user memory region is valid */
@@ -201,9 +201,9 @@ static int wait(tid_t child_tid)
 
 static bool create(const char *file, unsigned initial_size)
 {
-	if (!is_valid_user_ptr(file))
+	if (!is_valid_user_region(file, initial_size))
 	{
-		thread_exit();
+		exit(-1);
 	}
 
 	return filesys_create(file, initial_size);
@@ -223,7 +223,7 @@ static int open(const char *file)
 {
 	if (!is_valid_user_ptr(file))
 	{
-		thread_exit();
+		exit(-1);
 	}
 
 	struct file *f = filesys_open(file);
@@ -244,8 +244,6 @@ static int open(const char *file)
 
 struct file *get_file_by_fd(int fd)
 {
-	struct thread *curr = thread_current();
-
 	// 파일 디스크립터 유효성 검사
 	if (fd < 0 || fd >= FDT_COUNT_LIMIT)
 	{
@@ -253,7 +251,7 @@ struct file *get_file_by_fd(int fd)
 	}
 
 	// 해당 파일 디스크립터에 연결된 파일 객체 반환
-	return curr->fdt[fd];
+	return thread_current()->fdt[fd];
 }
 
 static int filesize(int fd)
@@ -272,7 +270,7 @@ static int read(int fd, void *buffer, unsigned size)
 {
 	if (!is_valid_user_region(buffer, size))
 	{
-		thread_exit();
+		exit(-1);
 	}
 
 	if (fd == 0)
@@ -312,7 +310,7 @@ static int write(int fd, const void *buffer, unsigned size)
 
 	if (!is_valid_user_region(buffer, size))
 	{
-		thread_exit();
+		exit(-1);
 	}
 
 	return file_write(file, buffer, size);
@@ -348,8 +346,9 @@ static void close(int fd)
 
 	if (file == NULL)
 	{
-		return;
+		exit(-1);
 	}
 
 	file_close(file);
+	thread_current()->fdt[fd] = NULL;
 }
