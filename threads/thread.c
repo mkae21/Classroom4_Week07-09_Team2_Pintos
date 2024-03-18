@@ -752,6 +752,10 @@ static void init_thread(struct thread *t, const char *name, int priority)
 	// for checking stackover flow
 	t->magic = THREAD_MAGIC;
 	list_init(&t->donations);
+
+#ifdef USERPROG
+	list_init(&t->children);
+#endif
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

@@ -130,7 +130,6 @@ bool sema_try_down(struct semaphore *sema)
    return success;
 }
 
-
 /* Up or "V" operation on a semaphore.  Increments SEMA's value
    and wakes up one thread of those waiting for SEMA, if any.
 
@@ -155,9 +154,8 @@ void sema_up(struct semaphore *sema)
    ++(sema->value);
    intr_set_level(old_level);
 
-   //ready_list가 비어 있어야 가능합니다
+   // ready_list가 비어 있어야 가능합니다
    thread_try_yield();
-
 }
 
 static void sema_test_helper(void *sema_);
