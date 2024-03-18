@@ -103,8 +103,6 @@ struct thread
 	int64_t tick;
 	int64_t wakeup_tick;
 
-	
-
 	/* Shared between thread.c and synch.c. */
 	/* thread.c와 synch.c가 공유합니다. */
 	struct list_elem elem;	   /* List element. */
@@ -128,6 +126,8 @@ struct thread
 	struct semaphore wait_sema;		   // 자식 프로세스가 종료될 때까지 대기하기 위한 세마포어
 	int exit_status;				   // 프로세스의 종료 상태
 	struct file *fdt[FDT_COUNT_LIMIT]; // 파일 디스크립터 테이블
+	int next_fd;					   // 다음 할당할 파일 디스크립터
+	struct dir *cwd;				   // 현재 작업 디렉토리
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */

@@ -1,12 +1,15 @@
-#include "userprog/syscall.h"
 #include <stdio.h>
 #include <syscall-nr.h>
-#include "threads/interrupt.h"
-#include "threads/thread.h"
-#include "threads/loader.h"
-#include "userprog/gdt.h"
-#include "threads/flags.h"
+#include "filesys/file.h"
+#include "filesys/filesys.h"
 #include "intrinsic.h"
+#include "lib/stdio.h"
+#include "threads/flags.h"
+#include "threads/interrupt.h"
+#include "threads/loader.h"
+#include "threads/thread.h"
+#include "userprog/gdt.h"
+#include "userprog/syscall.h"
 #include "userprog/process.h"
 
 void syscall_entry(void);
@@ -78,7 +81,8 @@ void syscall_init(void)
 
 void syscall_handler(struct intr_frame *f)
 {
-	printf("[syscall] syscall_handler - system call!\n");
+	// 아래 코드 printf 활성화 하면 테스트 케이스 통과 못 함 ㅎㅎ
+	// printf("[syscall] syscall_handler - system call!\n");
 
 	thread_current()->tf = *f;
 
@@ -182,18 +186,45 @@ static int wait(tid_t child_tid)
 
 static bool create(const char *file, unsigned initial_size)
 {
+	if (!is_valid_user_ptr(file))
+	{
+		thread_exit();
+	}
+
+	return filesys_create(file, initial_size);
 }
 
 static bool remove(const char *file)
 {
+	if (!is_valid_user_ptr(file))
+	{
+		thread_exit();
+	}
+
+	return filesys_remove(file);
 }
 
 static int open(const char *file)
 {
-}
+	if (!is_valid_user_ptr(file))
+	{
+		thread_exit();
+	}
 
-static int filesize(int fd)
-{
+	struct file *f = filesys_open(file);
+
+	if (f == NULL)
+	{
+		return -1;
+	}
+
+	struct thread *curr = thread_current();
+
+	// 파일 디스크립터 테이블에 파일 객체 추가
+	curr->fdt[curr->next_fd] = f;
+
+	// 다음 할당할 파일 디스크립터 반환
+	return curr->next_fd++;
 }
 
 struct file *get_file_by_fd(int fd)
@@ -208,6 +239,18 @@ struct file *get_file_by_fd(int fd)
 
 	// 해당 파일 디스크립터에 연결된 파일 객체 반환
 	return curr->fdt[fd];
+}
+
+static int filesize(int fd)
+{
+	struct file *file = get_file_by_fd(fd);
+
+	if (file == NULL)
+	{
+		return -1;
+	}
+
+	return file_length(file);
 }
 
 static int read(int fd, void *buffer, unsigned size)
@@ -239,16 +282,59 @@ static int read(int fd, void *buffer, unsigned size)
 
 static int write(int fd, const void *buffer, unsigned size)
 {
+	if (fd == STDOUT_FILENO)
+	{
+		putbuf(buffer, size);
+		return size;
+	}
+
+	struct file *file = get_file_by_fd(fd);
+
+	if (file == NULL)
+	{
+		return -1;
+	}
+
+	if (!is_valid_user_region(buffer, size))
+	{
+		thread_exit();
+	}
+
+	return file_write(file, buffer, size);
 }
 
 static void seek(int fd, unsigned position)
 {
+	struct file *file = get_file_by_fd(fd);
+
+	if (file == NULL)
+	{
+		return;
+	}
+
+	file_seek(file, position);
 }
 
 static unsigned tell(int fd)
 {
+	struct file *file = get_file_by_fd(fd);
+
+	if (file == NULL)
+	{
+		return -1;
+	}
+
+	return file_tell(file);
 }
 
 static void close(int fd)
 {
+	struct file *file = get_file_by_fd(fd);
+
+	if (file == NULL)
+	{
+		return;
+	}
+
+	file_close(file);
 }
