@@ -9,12 +9,15 @@
 #include "devices/disk.h"
 
 /* The disk that contains the file system. */
+/* 파일 시스템이 들어 있는 디스크입니다. */
 struct disk *filesys_disk;
 
 static void do_format(void);
 
 /* Initializes the file system module.
  * If FORMAT is true, reformats the file system. */
+/* 파일 시스템 모듈을 초기화합니다.
+ * FORMAT이 참이면 파일 시스템을 다시 포맷합니다. */
 void filesys_init(bool format)
 {
 	filesys_disk = disk_get(0, 1);
@@ -32,6 +35,7 @@ void filesys_init(bool format)
 	fat_open();
 #else
 	/* Original FS */
+	/* 원본 FS */
 	free_map_init();
 
 	if (format)
@@ -43,9 +47,12 @@ void filesys_init(bool format)
 
 /* Shuts down the file system module, writing any unwritten data
  * to disk. */
+/* 파일 시스템 모듈을 종료하여 기록되지 않은 데이터를
+ * 디스크에 씁니다. */
 void filesys_done(void)
 {
 	/* Original FS */
+	/* 원본 FS */
 #ifdef EFILESYS
 	fat_close();
 #else
@@ -57,6 +64,10 @@ void filesys_done(void)
  * Returns true if successful, false otherwise.
  * Fails if a file named NAME already exists,
  * or if internal memory allocation fails. */
+/* 지정된 INITIAL_SIZE로 NAME이라는 파일을 생성합니다.
+ * 성공하면 참을 반환하고, 그렇지 않으면 거짓을 반환합니다.
+ * NAME이라는 파일이 이미 존재하거나 내부 메모리 할당을
+ * 하지 못하면 실패합니다. */
 bool filesys_create(const char *name, off_t initial_size)
 {
 	disk_sector_t inode_sector = 0;
@@ -79,7 +90,7 @@ bool filesys_create(const char *name, off_t initial_size)
  * 존재하지 않거나 내부 메모리 할당이 실패하면 실패합니다. */
 struct file *filesys_open(const char *name)
 {
-	/*root directory open*/
+	/* root directory open */
 	struct dir *dir = dir_open_root();
 	struct inode *inode = NULL;
 
@@ -97,6 +108,10 @@ struct file *filesys_open(const char *name)
  * Returns true if successful, false on failure.
  * Fails if no file named NAME exists,
  * or if an internal memory allocation fails. */
+/* NAME이라는 파일을 삭제합니다.
+ * 성공하면 참을 반환하고 실패하면 거짓을 반환합니다.
+ * NAME이라는 파일이 존재하지 않거나
+ * 내부 메모리 할당을 하지 못하면 실패합니다. */
 bool filesys_remove(const char *name)
 {
 	struct dir *dir = dir_open_root();
@@ -107,13 +122,14 @@ bool filesys_remove(const char *name)
 }
 
 /* Formats the file system. */
-static void
-do_format(void)
+/* 파일 시스템을 포맷합니다. */
+static void do_format(void)
 {
 	printf("Formatting file system...");
 
 #ifdef EFILESYS
 	/* Create FAT and save it to the disk. */
+	/* FAT를 생성하고 디스크에 저장합니다. */
 	fat_create();
 	fat_close();
 #else
