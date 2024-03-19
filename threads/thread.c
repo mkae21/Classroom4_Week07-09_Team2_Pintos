@@ -756,6 +756,7 @@ static void init_thread(struct thread *t, const char *name, int priority)
 
 #ifdef USERPROG
 	list_init(&t->children);
+	sema_init(&t->child_wait_sema, 1);
 #endif
 }
 
