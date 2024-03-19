@@ -123,7 +123,7 @@ struct thread
 									   /* 자식 목록 */
 	struct list_elem child_elem;	   /* List element for child list */
 									   /* 자식 목록의 리스트 요소 */
-	struct semaphore wait_sema;		   // 자식 프로세스가 종료될 때까지 대기하기 위한 세마포어
+	struct semaphore child_wait_sema;  // 자식 프로세스가 종료될 때까지 대기하기 위한 세마포어
 	int exit_status;				   // 프로세스의 종료 상태
 	struct file *fdt[FDT_COUNT_LIMIT]; // 파일 디스크립터 테이블
 	int next_fd;					   // 다음 할당할 파일 디스크립터

@@ -257,6 +257,9 @@ static void __do_fork(void *aux)
 	/* 1. CPU 컨텍스트를 로컬 스택으로 읽습니다. */
 	memcpy(&if_, &parent->tf, sizeof(struct intr_frame));
 
+	// 자식 프로세스 반환 값은 0
+	if_.R.rax = 0;
+
 	/* 2. PT 복제 */
 	current->pml4 = pml4_create();
 
@@ -507,7 +510,7 @@ int process_wait(tid_t child_tid)
 	}
 
 	/* 자식 프로세스가 종료될 때까지 대기 */
-	sema_down(&child->wait_sema);
+	sema_down(&child->child_wait_sema);
 
 	/* 자식 프로세스의 종료 상태를 가져옴 */
 	int exit_status = child->exit_status;
@@ -541,10 +544,6 @@ int process_wait(tid_t child_tid)
 void process_exit(void)
 {
 	struct thread *curr = thread_current();
-
-	/* 프로세스 종료 메시지를 출력
-	 * 프로세스 이름과 종료 상태를 출력 */
-	printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 
 	/* 부모 프로세스가 자식 프로세스의 종료를 알 수 있도록 wait_sema를 up */
 	// TODO: 아래 코드 필요 있는 지 논의 필요 - Hyeonwoo, 2024.03.18
