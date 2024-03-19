@@ -160,7 +160,12 @@ static void exit(int status)
 {
 #ifdef USERPROG
 	// 현재 스레드의 exit_status를 설정
-	thread_current()->exit_status = status;
+	struct thread *curr = thread_current();
+	curr->exit_status = status;
+
+	/* 프로세스 종료 메시지를 출력
+	 * 프로세스 이름과 종료 상태를 출력 */
+	printf("%s: exit(%d)\n", curr->name, status);
 #endif
 
 	// 프로세스 종료
