@@ -11,6 +11,7 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+#include "lib/stdio.h"
 #ifdef USERPROG
 #include "userprog/process.h"
 #endif
@@ -339,6 +340,13 @@ tid_t thread_create(const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+
+	t->fdt = palloc_get_multiple(PAL_ZERO & PAL_ASSERT, FDT_PAGES);
+	t->fdt[0] = STDIN_FILENO;
+	t->fdt[1] = STDOUT_FILENO;
+
+	// fork일 때만 자식 프로세스를 고려하면 잠재적 문제가 생길 수 있을 것으로 예상
+	list_push_back(&thread_current()->children, &t->child_elem);
 
 	/* Add to run queue. */
 	thread_unblock(t);
@@ -756,7 +764,9 @@ static void init_thread(struct thread *t, const char *name, int priority)
 
 #ifdef USERPROG
 	list_init(&t->children);
-	sema_init(&t->child_wait_sema, 1);
+	sema_init(&t->child_wait_sema, 0);
+	sema_init(&t->duplicate_sema, 0);
+	// sema_init(&t->exit_sema, 0);
 #endif
 }
 

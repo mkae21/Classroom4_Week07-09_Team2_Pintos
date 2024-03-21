@@ -85,6 +85,9 @@ typedef int tid_t;
    준비 상태의 스레드만 실행 대기열에 있는 반면, 차단 상태의 스레드만
    세마포어 대기 목록에 있기 때문에 이 두 가지 방법으로만 사용할 수 있습니다. */
 
+/* Project 2: System Call FDT */
+#define FDT_PAGES 3 // 왜 값이 3인지 THE Jungle에게 문의 필요
+#define FDT_SIZE (FDT_PAGES * (1 << 9))
 #define FDT_COUNT_LIMIT 128 // 파일 디스크립터 테이블의 최대 크기
 
 struct thread
@@ -117,17 +120,25 @@ struct thread
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	/* 소유: userprog/process.c. */
-	uint64_t *pml4;					   /* Page map level 4 */
-									   /* 페이지 맵 레벨 4 */
-	struct list children;			   /* List of children */
-									   /* 자식 목록 */
-	struct list_elem child_elem;	   /* List element for child list */
-									   /* 자식 목록의 리스트 요소 */
-	struct semaphore child_wait_sema;  // 자식 프로세스가 종료될 때까지 대기하기 위한 세마포어
-	int exit_status;				   // 프로세스의 종료 상태
-	struct file *fdt[FDT_COUNT_LIMIT]; // 파일 디스크립터 테이블
-	int next_fd;					   // 다음 할당할 파일 디스크립터
-	struct dir *cwd;				   // 현재 작업 디렉토리
+	uint64_t *pml4;					  /* Page map level 4 */
+									  /* 페이지 맵 레벨 4 */
+	struct list children;			  /* List of children */
+									  /* 자식 목록 */
+	struct list_elem child_elem;	  /* List element for child list */
+									  /* 자식 목록의 리스트 요소 */
+	struct semaphore duplicate_sema;  // 복제 완료를 알리기 위한 세마포어
+	struct semaphore child_wait_sema; // 자식 프로세스가 종료될 때까지 대기하기 위한 세마포어
+	// struct semaphore exit_sema;		   // 종료 완료를 알리기 위한 세마포어
+	int exit_status;		   // 프로세스의 종료 상태
+	int next_fd;			   // 다음 할당할 파일 디스크립터
+	struct dir *cwd;		   // 현재 작업 디렉토리
+	struct file *loading_file; // 현재 로딩 중인 파일
+
+	// 아래 두 개의 멤버 변수는 부모 프로세스와 자식 프로세스 값이 같아야 함
+	// 부모를 찾는 용도가 아닌, 데이터가 변형되지 않은 원본을 보관하기 위한 용도
+	// fork가 끝나면 의미가 없어지므로, fork가 끝나면 NULL로 초기화
+	struct intr_frame parent_if; // 부모 프로세스의 intr_frame
+	struct file **fdt;			 // 파일 디스크립터 테이블
 #endif
 #ifdef VM
 	/* Table for whole virtual memory owned by thread. */
