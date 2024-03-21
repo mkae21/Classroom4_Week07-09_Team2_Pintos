@@ -212,6 +212,7 @@ static void page_fault(struct intr_frame *f)
 	/* Count page faults. */
 	/* 페이지 오류를 계산합니다. */
 	page_fault_cnt++;
+	exit(-1);
 
 	/* If the fault is true fault, show info and exit. */
 	/* 결함이 실제 결함인 경우, 정보를 표시하고 종료합니다. */
